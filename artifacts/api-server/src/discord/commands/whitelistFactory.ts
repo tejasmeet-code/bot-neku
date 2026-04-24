@@ -8,6 +8,7 @@ import type { SlashCommand } from "../types";
 import {
   addToWhitelist,
   listWhitelist,
+  listGuildAllWhitelist,
   removeFromWhitelist,
   isWhitelisted,
   PERM_WHITELIST,
@@ -128,18 +129,23 @@ export function buildWhitelistCommand(
 
       if (sub === "list") {
         const ids = await listWhitelist(command, guildId);
+        const allIds = await listGuildAllWhitelist(guildId);
         const permLines = [...PERM_WHITELIST].map(
           (id) => `• <@${id}> *(global)*`,
         );
-        const guildLines = ids.map((id) => `• <@${id}>`);
+        const allLines = allIds.map((id) => `• <@${id}> *(all-commands)*`);
+        const guildLines = ids
+          .filter((id) => !allIds.includes(id))
+          .map((id) => `• <@${id}>`);
         const description =
-          [...permLines, ...guildLines].join("\n") || "*Nobody yet.*";
+          [...permLines, ...allLines, ...guildLines].join("\n") ||
+          "*Nobody yet.*";
         const embed = new EmbedBuilder()
           .setTitle(`Whitelist — /${command}`)
           .setColor(0x5865f2)
           .setDescription(description)
           .setFooter({
-            text: `${ids.length} server entr${ids.length === 1 ? "y" : "ies"} • ${PERM_WHITELIST.size} global`,
+            text: `${ids.length} command-specific • ${allIds.length} all-commands • ${PERM_WHITELIST.size} global`,
           });
         await interaction.reply({ embeds: [embed], ephemeral: true });
         return;

@@ -20,6 +20,8 @@ export type WhitelistedCommand = (typeof WHITELISTED_COMMANDS)[number];
 interface WhitelistShape {
   // perGuild[guildId][commandName] = [userId, ...]
   perGuild: Record<string, Record<string, string[]>>;
+  // guildAll[guildId] = [userId, ...]  (whitelisted for every restricted command in that guild)
+  guildAll: Record<string, string[]>;
 }
 
 const DATA_DIR = path.resolve(process.cwd(), ".data");
@@ -32,15 +34,19 @@ async function load(): Promise<WhitelistShape> {
   if (cache) return cache;
   try {
     const raw = await fs.readFile(FILE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as WhitelistShape;
+    const parsed = JSON.parse(raw) as Partial<WhitelistShape>;
     cache = {
       perGuild:
         parsed.perGuild && typeof parsed.perGuild === "object"
           ? parsed.perGuild
           : {},
+      guildAll:
+        parsed.guildAll && typeof parsed.guildAll === "object"
+          ? parsed.guildAll
+          : {},
     };
   } catch {
-    cache = { perGuild: {} };
+    cache = { perGuild: {}, guildAll: {} };
   }
   return cache;
 }
@@ -67,7 +73,51 @@ export async function isWhitelisted(
 ): Promise<boolean> {
   if (PERM_WHITELIST.has(userId)) return true;
   const data = await load();
+  if (data.guildAll[guildId]?.includes(userId)) return true;
   return data.perGuild[guildId]?.[command]?.includes(userId) ?? false;
+}
+
+export async function isOnGuildAllWhitelist(
+  guildId: string,
+  userId: string,
+): Promise<boolean> {
+  const data = await load();
+  return data.guildAll[guildId]?.includes(userId) ?? false;
+}
+
+export async function addToGuildAllWhitelist(
+  guildId: string,
+  userId: string,
+): Promise<boolean> {
+  const data = await load();
+  if (!data.guildAll[guildId]) data.guildAll[guildId] = [];
+  if (data.guildAll[guildId].includes(userId)) return false;
+  data.guildAll[guildId].push(userId);
+  writeQueue = writeQueue.then(() => persist(data)).catch(() => {});
+  await writeQueue;
+  return true;
+}
+
+export async function removeFromGuildAllWhitelist(
+  guildId: string,
+  userId: string,
+): Promise<boolean> {
+  const data = await load();
+  const bucket = data.guildAll[guildId];
+  if (!bucket) return false;
+  const idx = bucket.indexOf(userId);
+  if (idx === -1) return false;
+  bucket.splice(idx, 1);
+  writeQueue = writeQueue.then(() => persist(data)).catch(() => {});
+  await writeQueue;
+  return true;
+}
+
+export async function listGuildAllWhitelist(
+  guildId: string,
+): Promise<string[]> {
+  const data = await load();
+  return [...(data.guildAll[guildId] ?? [])];
 }
 
 export async function addToWhitelist(
