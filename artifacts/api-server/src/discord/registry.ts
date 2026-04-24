@@ -10,6 +10,8 @@ import say from "./commands/say";
 import ban from "./commands/ban";
 import mute from "./commands/mute";
 import unmute from "./commands/unmute";
+import warn from "./commands/warn";
+import dm from "./commands/dm";
 
 const commands: SlashCommand[] = [
   ping,
@@ -23,6 +25,8 @@ const commands: SlashCommand[] = [
   ban,
   mute,
   unmute,
+  warn,
+  dm,
 ];
 
 export function getCommands(): SlashCommand[] {

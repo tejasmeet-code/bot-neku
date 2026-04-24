@@ -4,41 +4,15 @@ import {
   GatewayIntentBits,
   REST,
   Routes,
+  type ClientOptions,
 } from "discord.js";
 import { logger } from "../lib/logger";
 import { getCommandMap, getCommands } from "./registry";
 
-export async function startDiscordBot(): Promise<void> {
-  const token = process.env["DISCORD_BOT_TOKEN"];
-  const clientId = process.env["DISCORD_CLIENT_ID"];
-
-  if (!token || !clientId) {
-    logger.warn(
-      "DISCORD_BOT_TOKEN or DISCORD_CLIENT_ID not set; Discord bot disabled.",
-    );
-    return;
-  }
-
-  const commands = getCommands();
+function buildClient(intents: GatewayIntentBits[]): Client {
+  const options: ClientOptions = { intents };
+  const client = new Client(options);
   const commandMap = getCommandMap();
-
-  const rest = new REST({ version: "10" }).setToken(token);
-  try {
-    logger.info(
-      { count: commands.length },
-      "Registering Discord slash commands globally",
-    );
-    await rest.put(Routes.applicationCommands(clientId), {
-      body: commands.map((c) => c.data.toJSON()),
-    });
-    logger.info("Slash commands registered");
-  } catch (err) {
-    logger.error({ err }, "Failed to register slash commands");
-  }
-
-  const client = new Client({
-    intents: [GatewayIntentBits.Guilds],
-  });
 
   client.once(Events.ClientReady, (c) => {
     logger.info({ tag: c.user.tag }, "Discord bot ready");
@@ -78,5 +52,61 @@ export async function startDiscordBot(): Promise<void> {
     logger.error({ err }, "Discord client error");
   });
 
-  await client.login(token);
+  return client;
+}
+
+export async function startDiscordBot(): Promise<void> {
+  const token = process.env["DISCORD_BOT_TOKEN"];
+  const clientId = process.env["DISCORD_CLIENT_ID"];
+
+  if (!token || !clientId) {
+    logger.warn(
+      "DISCORD_BOT_TOKEN or DISCORD_CLIENT_ID not set; Discord bot disabled.",
+    );
+    return;
+  }
+
+  const commands = getCommands();
+  const rest = new REST({ version: "10" }).setToken(token);
+  try {
+    logger.info(
+      { count: commands.length },
+      "Registering Discord slash commands globally",
+    );
+    await rest.put(Routes.applicationCommands(clientId), {
+      body: commands.map((c) => c.data.toJSON()),
+    });
+    logger.info("Slash commands registered");
+  } catch (err) {
+    logger.error({ err }, "Failed to register slash commands");
+  }
+
+  const fullIntents = [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+  ];
+  const fallbackIntents = [GatewayIntentBits.Guilds];
+
+  let client = buildClient(fullIntents);
+  try {
+    await client.login(token);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/disallowed intents/i.test(message)) {
+      logger.warn(
+        "Server Members Intent is not enabled in the Discord Developer Portal. " +
+          "/dm to roles or @everyone will not work until you enable it under " +
+          "your bot's 'Privileged Gateway Intents'. Restarting bot without that intent.",
+      );
+      try {
+        client.destroy();
+      } catch {
+        // ignore
+      }
+      client = buildClient(fallbackIntents);
+      await client.login(token);
+    } else {
+      throw err;
+    }
+  }
 }
