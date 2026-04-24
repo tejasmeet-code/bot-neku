@@ -124,9 +124,10 @@ const command: SlashCommand = {
     try {
       await member.timeout(ms, `${reason} — by ${interaction.user.tag}`);
       const until = Math.floor((Date.now() + ms) / 1000);
-      await interaction.reply(
-        `🔇 **${target.tag}** has been muted until <t:${until}:R>. Reason: ${reason}`,
-      );
+      await interaction.reply({
+        content: `🔇 **${target.tag}** has been muted until <t:${until}:R>. Reason: ${reason}`,
+        ephemeral: true,
+      });
     } catch {
       await interaction.reply({
         content: "Failed to mute that user.",

@@ -92,9 +92,10 @@ const command: SlashCommand = {
         reason: `${reason} — by ${interaction.user.tag}`,
         deleteMessageSeconds: deleteDays * 86400,
       });
-      await interaction.reply(
-        `🔨 **${target.tag}** has been banned. Reason: ${reason}`,
-      );
+      await interaction.reply({
+        content: `🔨 **${target.tag}** has been banned. Reason: ${reason}`,
+        ephemeral: true,
+      });
     } catch {
       await interaction.reply({
         content: "Failed to ban that user.",

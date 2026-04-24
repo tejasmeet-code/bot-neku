@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { logger } from "../lib/logger";
 import { getCommandMap, getCommands } from "./registry";
+import { handlePrefixMessage } from "./messageHandler";
 
 function buildClient(intents: GatewayIntentBits[]): Client {
   const options: ClientOptions = { intents };
@@ -48,6 +49,12 @@ function buildClient(intents: GatewayIntentBits[]): Client {
     }
   });
 
+  client.on(Events.MessageCreate, (message) => {
+    handlePrefixMessage(message).catch((err) => {
+      logger.error({ err }, "Prefix message handler failed");
+    });
+  });
+
   client.on(Events.Error, (err) => {
     logger.error({ err }, "Discord client error");
   });
@@ -81,32 +88,56 @@ export async function startDiscordBot(): Promise<void> {
     logger.error({ err }, "Failed to register slash commands");
   }
 
-  const fullIntents = [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
+  // Intent fallbacks: full → drop MessageContent → drop GuildMembers → minimal.
+  const intentLevels: { intents: GatewayIntentBits[]; warn?: string }[] = [
+    {
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+      ],
+    },
+    {
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+      ],
+      warn:
+        "Message Content Intent is not enabled. The `?n` prefix command will not work until you enable it under your bot's 'Privileged Gateway Intents'. Continuing without it.",
+    },
+    {
+      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+      warn:
+        "Server Members Intent is not enabled. /dm to roles or @everyone (and `?n` to roles/everyone) will not work until you enable it under your bot's 'Privileged Gateway Intents'. Continuing without it.",
+    },
+    {
+      intents: [GatewayIntentBits.Guilds],
+      warn:
+        "All privileged intents are disabled. Slash commands work, but DM features and `?n` will not. Continuing in minimal mode.",
+    },
   ];
-  const fallbackIntents = [GatewayIntentBits.Guilds];
 
-  let client = buildClient(fullIntents);
-  try {
-    await client.login(token);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (/disallowed intents/i.test(message)) {
-      logger.warn(
-        "Server Members Intent is not enabled in the Discord Developer Portal. " +
-          "/dm to roles or @everyone will not work until you enable it under " +
-          "your bot's 'Privileged Gateway Intents'. Restarting bot without that intent.",
-      );
+  let lastErr: unknown = null;
+  for (let i = 0; i < intentLevels.length; i++) {
+    const level = intentLevels[i];
+    const client = buildClient(level.intents);
+    try {
+      await client.login(token);
+      if (level.warn) logger.warn(level.warn);
+      return;
+    } catch (err) {
+      lastErr = err;
+      const message = err instanceof Error ? err.message : String(err);
       try {
         client.destroy();
       } catch {
         // ignore
       }
-      client = buildClient(fallbackIntents);
-      await client.login(token);
-    } else {
-      throw err;
+      if (!/disallowed intents/i.test(message)) throw err;
+      // Try the next, smaller intent set.
     }
   }
+  throw lastErr ?? new Error("Failed to log in with any intent combination.");
 }

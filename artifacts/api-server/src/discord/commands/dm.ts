@@ -8,14 +8,12 @@ import {
 } from "discord.js";
 import type { SlashCommand } from "../types";
 import { ensureWhitelisted } from "../utils/gate";
-import { logger } from "../../lib/logger";
-
-const MAX_RECIPIENTS = 50;
-
-interface Recipients {
-  users: Map<string, User>;
-  label: string;
-}
+import {
+  MAX_RECIPIENTS,
+  resolveDmRecipients,
+  sendDmsToUsers,
+  type DmTarget,
+} from "../utils/dmCore";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -61,21 +59,26 @@ const command: SlashCommand = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const payload = message;
+    const guild = interaction.guild;
+    const wantsEveryone =
+      everyoneFlag ||
+      (target && typeof target === "object" && "id" in target &&
+        (target as { id: string }).id === guild.id);
 
-    let recipients: Recipients;
+    const dmTarget: DmTarget = { everyone: !!wantsEveryone };
+    if (!wantsEveryone && target) {
+      if (isRole(target)) dmTarget.role = target;
+      else if (isGuildMember(target)) dmTarget.member = target;
+      else if (isUser(target)) dmTarget.user = target;
+    }
+
+    let recipients: { users: Map<string, User>; label: string };
     try {
-      recipients = await resolveRecipients(interaction, target, everyoneFlag);
+      recipients = await resolveDmRecipients(guild, dmTarget);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await interaction.editReply(msg);
       return;
-    }
-
-    // Drop bots and the invoker themselves.
-    for (const id of [...recipients.users.keys()]) {
-      const u = recipients.users.get(id)!;
-      if (u.bot) recipients.users.delete(id);
     }
 
     if (recipients.users.size === 0) {
@@ -92,89 +95,14 @@ const command: SlashCommand = {
       return;
     }
 
-    let sent = 0;
-    let failed = 0;
-    for (const user of recipients.users.values()) {
-      try {
-        await user.send(payload);
-        sent++;
-      } catch (err) {
-        failed++;
-        logger.debug({ err, userId: user.id }, "DM failed");
-      }
-    }
-
+    const { sent, failed } = await sendDmsToUsers(recipients.users, message);
     const failNote =
-      failed > 0
-        ? ` Failed for **${failed}** (DMs closed or blocked).`
-        : "";
+      failed > 0 ? ` Failed for **${failed}** (DMs closed or blocked).` : "";
     await interaction.editReply(
       `📬 Sent to **${sent}** member${sent === 1 ? "" : "s"} (${recipients.label}).${failNote}`,
     );
   },
 };
-
-async function resolveRecipients(
-  interaction: ChatInputCommandInteraction,
-  target: unknown,
-  everyoneFlag: boolean,
-): Promise<Recipients> {
-  const guild = interaction.guild!;
-  const targetObj =
-    target && typeof target === "object" ? (target as Record<string, unknown>) : null;
-  const targetId =
-    targetObj && typeof targetObj.id === "string" ? targetObj.id : null;
-  const wantsEveryone = everyoneFlag || targetId === guild.id;
-
-  if (wantsEveryone) {
-    const members = await fetchAllMembers(interaction);
-    const users = new Map<string, User>();
-    for (const m of members.values()) users.set(m.user.id, m.user);
-    return { users, label: "everyone" };
-  }
-
-  if (target && isUser(target)) {
-    return {
-      users: new Map([[target.id, target]]),
-      label: target.tag,
-    };
-  }
-
-  if (target && isGuildMember(target)) {
-    return {
-      users: new Map([[target.user.id, target.user]]),
-      label: target.user.tag,
-    };
-  }
-
-  if (target && isRole(target)) {
-    // Make sure we have all members cached for the role.
-    await fetchAllMembers(interaction);
-    const role = await guild.roles.fetch(target.id).catch(() => null);
-    if (!role) {
-      throw new Error("Couldn't find that role.");
-    }
-    const users = new Map<string, User>();
-    for (const m of role.members.values()) users.set(m.user.id, m.user);
-    return { users, label: `role @${role.name}` };
-  }
-
-  throw new Error(
-    "Couldn't understand that target. Try a user, a role, or set `everyone:true`.",
-  );
-}
-
-async function fetchAllMembers(interaction: ChatInputCommandInteraction) {
-  try {
-    return await interaction.guild!.members.fetch();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.warn({ err: msg }, "Failed to fetch guild members for /dm");
-    throw new Error(
-      "I couldn't load the server's member list. Enable the **Server Members Intent** for the bot in the Discord Developer Portal (Bot → Privileged Gateway Intents), then restart the bot.",
-    );
-  }
-}
 
 function isUser(t: unknown): t is User {
   return (

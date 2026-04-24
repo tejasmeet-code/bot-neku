@@ -97,9 +97,10 @@ const command: SlashCommand = {
         )
         .catch(() => {});
 
-      await interaction.reply(
-        `⚠️ **${target.tag}** has been warned. Reason: ${reason}\nThey now have **${total}** warning${total === 1 ? "" : "s"}.`,
-      );
+      await interaction.reply({
+        content: `⚠️ **${target.tag}** has been warned. Reason: ${reason}\nThey now have **${total}** warning${total === 1 ? "" : "s"}.`,
+        ephemeral: true,
+      });
       return;
     }
 
@@ -141,9 +142,10 @@ const command: SlashCommand = {
         });
         return;
       }
-      await interaction.reply(
-        `🧹 Cleared **${removed}** warning${removed === 1 ? "" : "s"} for **${target.tag}**.`,
-      );
+      await interaction.reply({
+        content: `🧹 Cleared **${removed}** warning${removed === 1 ? "" : "s"} for **${target.tag}**.`,
+        ephemeral: true,
+      });
       return;
     }
   },

@@ -53,7 +53,10 @@ const command: SlashCommand = {
 
     try {
       await member.timeout(null, `Unmuted by ${interaction.user.tag}`);
-      await interaction.reply(`🔊 **${target.tag}** has been unmuted.`);
+      await interaction.reply({
+        content: `🔊 **${target.tag}** has been unmuted.`,
+        ephemeral: true,
+      });
     } catch {
       await interaction.reply({
         content: "Failed to unmute that user.",
