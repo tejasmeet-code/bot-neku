@@ -61,9 +61,7 @@ const command: SlashCommand = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const guild = interaction.guild;
-    const signature = `\n\n— sent by ${interaction.user.tag} from **${guild.name}**`;
-    const payload = `${message}${signature}`;
+    const payload = message;
 
     let recipients: Recipients;
     try {
