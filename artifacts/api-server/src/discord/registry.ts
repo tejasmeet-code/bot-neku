@@ -7,6 +7,9 @@ import roll from "./commands/roll";
 import eightball from "./commands/eightball";
 import avatar from "./commands/avatar";
 import say from "./commands/say";
+import ban from "./commands/ban";
+import mute from "./commands/mute";
+import unmute from "./commands/unmute";
 
 const commands: SlashCommand[] = [
   ping,
@@ -17,6 +20,9 @@ const commands: SlashCommand[] = [
   eightball,
   avatar,
   say,
+  ban,
+  mute,
+  unmute,
 ];
 
 export function getCommands(): SlashCommand[] {

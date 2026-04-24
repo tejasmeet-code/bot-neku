@@ -32,7 +32,7 @@ The api-server artifact also hosts a Discord bot using `discord.js` v14.
 - Commands live in `artifacts/api-server/src/discord/commands/` and are registered in `registry.ts`
 - Required secrets: `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`
 - Slash commands are registered globally on startup (may take a few minutes to appear in clients)
-- Built-in commands: `/ping`, `/help`, `/serverinfo`, `/userinfo`, `/roll`, `/8ball`, `/avatar`, `/say`
+- Built-in commands: `/ping`, `/help`, `/serverinfo`, `/userinfo`, `/roll`, `/8ball`, `/avatar`, `/say`, `/ban`, `/mute`, `/unmute`
 
 To add a new command, create a file in `commands/`, default-export an object matching the `SlashCommand` type, and add it to the array in `registry.ts`.
 

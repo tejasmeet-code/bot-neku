@@ -1,0 +1,70 @@
+import {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  type ChatInputCommandInteraction,
+} from "discord.js";
+import type { SlashCommand } from "../types";
+
+const command: SlashCommand = {
+  data: new SlashCommandBuilder()
+    .setName("unmute")
+    .setDescription("Remove a timeout (mute) from a user.")
+    .addUserOption((option) =>
+      option
+        .setName("user")
+        .setDescription("The user to unmute")
+        .setRequired(true),
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+    .setDMPermission(false),
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!interaction.inGuild() || !interaction.guild) {
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const target = interaction.options.getUser("user", true);
+    const member = await interaction.guild.members
+      .fetch(target.id)
+      .catch(() => null);
+
+    if (!member) {
+      await interaction.reply({
+        content: "That user isn't in this server.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (!member.isCommunicationDisabled()) {
+      await interaction.reply({
+        content: "That user isn't currently muted.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (!member.moderatable) {
+      await interaction.reply({
+        content: "I can't unmute that user.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    try {
+      await member.timeout(null, `Unmuted by ${interaction.user.tag}`);
+      await interaction.reply(`🔊 **${target.tag}** has been unmuted.`);
+    } catch {
+      await interaction.reply({
+        content: "Failed to unmute that user.",
+        ephemeral: true,
+      });
+    }
+  },
+};
+
+export default command;
