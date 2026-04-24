@@ -4,6 +4,7 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
+import { ensureWhitelisted } from "../utils/gate";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -33,13 +34,8 @@ const command: SlashCommand = {
     .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
     .setDMPermission(false),
   async execute(interaction: ChatInputCommandInteraction) {
-    if (!interaction.inGuild() || !interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        ephemeral: true,
-      });
-      return;
-    }
+    if (!(await ensureWhitelisted(interaction, "ban"))) return;
+    if (!interaction.guild) return;
 
     const target = interaction.options.getUser("user", true);
     const reason =

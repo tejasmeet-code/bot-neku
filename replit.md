@@ -33,6 +33,8 @@ The api-server artifact also hosts a Discord bot using `discord.js` v14.
 - Required secrets: `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`
 - Slash commands are registered globally on startup (may take a few minutes to appear in clients)
 - Built-in commands: `/ping`, `/help`, `/serverinfo`, `/userinfo`, `/roll`, `/8ball`, `/avatar`, `/say`, `/ban`, `/mute`, `/unmute`, `/warn`, `/dm`
+- Whitelist-managed commands: `ban`, `mute`, `unmute`, `warn`, `dm`, `say`. Each has a matching `/whitelist-<command>` with `add`/`remove`/`list` subcommands. Whitelists are per-guild and persist to `.data/whitelist.json`.
+- Global perm-whitelist (can use any restricted command in any server) is hardcoded in `src/discord/storage/whitelist.ts` (`PERM_WHITELIST`).
 - Warnings persist to `.data/warnings.json` (relative to the api-server cwd).
 - `/dm` to a role or `@everyone` requires the **Server Members Intent** to be enabled in the Discord Developer Portal under Bot → Privileged Gateway Intents. The bot falls back to a Guilds-only connection when the intent is disabled (DMs to a single user still work).
 

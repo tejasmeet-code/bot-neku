@@ -10,6 +10,7 @@ import {
   clearWarnings,
   getWarnings,
 } from "../storage/warnings";
+import { ensureWhitelisted } from "../utils/gate";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -58,13 +59,8 @@ const command: SlashCommand = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .setDMPermission(false),
   async execute(interaction: ChatInputCommandInteraction) {
-    if (!interaction.inGuild() || !interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        ephemeral: true,
-      });
-      return;
-    }
+    if (!(await ensureWhitelisted(interaction, "warn"))) return;
+    if (!interaction.guildId) return;
 
     const sub = interaction.options.getSubcommand();
     const target = interaction.options.getUser("user", true);

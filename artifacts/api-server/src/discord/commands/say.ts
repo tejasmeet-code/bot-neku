@@ -4,6 +4,7 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
+import { ensureWhitelisted } from "../utils/gate";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -18,6 +19,7 @@ const command: SlashCommand = {
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (!(await ensureWhitelisted(interaction, "say"))) return;
     const message = interaction.options.getString("message", true);
     await interaction.reply({
       content: "Sent.",

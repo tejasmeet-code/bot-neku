@@ -4,6 +4,7 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
+import { ensureWhitelisted } from "../utils/gate";
 
 const UNIT_MS: Record<string, number> = {
   s: 1_000,
@@ -50,13 +51,8 @@ const command: SlashCommand = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .setDMPermission(false),
   async execute(interaction: ChatInputCommandInteraction) {
-    if (!interaction.inGuild() || !interaction.guild) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        ephemeral: true,
-      });
-      return;
-    }
+    if (!(await ensureWhitelisted(interaction, "mute"))) return;
+    if (!interaction.guild) return;
 
     const target = interaction.options.getUser("user", true);
     const durationInput = interaction.options.getString("duration", true);

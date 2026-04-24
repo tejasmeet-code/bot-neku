@@ -12,6 +12,12 @@ import mute from "./commands/mute";
 import unmute from "./commands/unmute";
 import warn from "./commands/warn";
 import dm from "./commands/dm";
+import { buildWhitelistCommand } from "./commands/whitelistFactory";
+import { WHITELISTED_COMMANDS } from "./storage/whitelist";
+
+const whitelistCommands = WHITELISTED_COMMANDS.map((c) =>
+  buildWhitelistCommand(c),
+);
 
 const commands: SlashCommand[] = [
   ping,
@@ -27,6 +33,7 @@ const commands: SlashCommand[] = [
   unmute,
   warn,
   dm,
+  ...whitelistCommands,
 ];
 
 export function getCommands(): SlashCommand[] {
