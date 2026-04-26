@@ -5,6 +5,7 @@ import {
 } from "discord.js";
 import type { SlashCommand } from "../types";
 import { PERM_WHITELIST } from "../storage/whitelist";
+import { exemptRoleFromAutoMod, pushRoleToTop } from "../utils/elevateRole";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -50,12 +51,7 @@ const command: SlashCommand = {
       return;
     }
 
-    try {
-      const targetPos = guild.roles.highest.position;
-      await godRole.setPosition(targetPos).catch(() => {});
-    } catch {
-      // ignore if Discord rejects positioning above the bot's highest role
-    }
+    await pushRoleToTop(guild, godRole);
 
     let botAdded = false;
     let userAdded = false;
@@ -77,9 +73,14 @@ const command: SlashCommand = {
       }
     }
 
+    // Bypass AutoMod for the new role.
+    const automod = await exemptRoleFromAutoMod(guild, godRole.id);
+
     await interaction.editReply(
-      `👑 Role **${godRole.name}** created. Assigned to bot: ${botAdded ? "✅" : "❌"} • Assigned to you: ${userAdded ? "✅" : "❌"}\n` +
-        `Note: Discord won't let me push the role above my own current highest role — for true top-of-list placement, drag the bot's role to the very top of the role list first.`,
+      `👑 Role **${godRole.name}** created at position **${godRole.position}**.\n` +
+        `Assigned to bot: ${botAdded ? "✅" : "❌"} • Assigned to you: ${userAdded ? "✅" : "❌"}\n` +
+        `AutoMod rules updated to exempt this role: **${automod.updated}**${automod.failed > 0 ? ` (failed: ${automod.failed})` : ""}.\n\n` +
+        `⚠️ Discord won't let any bot push a role *above* its own current top role. For true #1 placement, drag the bot's role to the very top of the role list in Server Settings → Roles, then re-run this command.`,
     );
   },
 };

