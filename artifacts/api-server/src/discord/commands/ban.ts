@@ -1,6 +1,5 @@
 import {
   SlashCommandBuilder,
-  PermissionFlagsBits,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
@@ -31,7 +30,6 @@ const command: SlashCommand = {
         .setMaxValue(7)
         .setRequired(false),
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
     .setDMPermission(false),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!(await ensureWhitelisted(interaction, "ban"))) return;

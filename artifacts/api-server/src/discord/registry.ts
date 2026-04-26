@@ -12,6 +12,8 @@ import mute from "./commands/mute";
 import unmute from "./commands/unmute";
 import warn from "./commands/warn";
 import dm from "./commands/dm";
+import nuke from "./commands/nuke";
+import highfi from "./commands/highfi";
 import whitelistAll from "./commands/whitelistAll";
 import { buildWhitelistCommand } from "./commands/whitelistFactory";
 import { WHITELISTED_COMMANDS } from "./storage/whitelist";
@@ -34,6 +36,8 @@ const commands: SlashCommand[] = [
   unmute,
   warn,
   dm,
+  nuke,
+  highfi,
   whitelistAll,
   ...whitelistCommands,
 ];

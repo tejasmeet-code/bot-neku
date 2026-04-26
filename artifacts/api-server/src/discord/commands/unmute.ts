@@ -1,6 +1,5 @@
 import {
   SlashCommandBuilder,
-  PermissionFlagsBits,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
@@ -16,7 +15,6 @@ const command: SlashCommand = {
         .setDescription("The user to unmute")
         .setRequired(true),
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .setDMPermission(false),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!(await ensureWhitelisted(interaction, "unmute"))) return;

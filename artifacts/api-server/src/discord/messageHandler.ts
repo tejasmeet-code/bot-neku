@@ -7,7 +7,9 @@ import {
 import { logger } from "../lib/logger";
 import { isWhitelisted, PERM_WHITELIST } from "./storage/whitelist";
 import {
-  MAX_RECIPIENTS,
+  DM_INTERVAL_MS,
+  MAX_RECIPIENTS_HARD_CAP,
+  estimateDmSeconds,
   resolveDmRecipients,
   sendDmsToUsers,
   type DmTarget,
@@ -110,16 +112,30 @@ export async function handlePrefixMessage(message: Message): Promise<void> {
     return;
   }
 
-  if (recipients.users.size > MAX_RECIPIENTS) {
+  if (recipients.users.size > MAX_RECIPIENTS_HARD_CAP) {
     author
       .send(
-        `That would DM **${recipients.users.size}** members. Mass-DM is capped at ${MAX_RECIPIENTS} per command — narrow the target.`,
+        `That would DM **${recipients.users.size}** members, over the safety cap of ${MAX_RECIPIENTS_HARD_CAP}. Narrow the target.`,
       )
       .catch(() => {});
     return;
   }
 
-  const { sent, failed } = await sendDmsToUsers(recipients.users, body);
+  const total = recipients.users.size;
+  if (total > 1) {
+    const secs = estimateDmSeconds(total, DM_INTERVAL_MS);
+    author
+      .send(
+        `📬 \`${PREFIX}\` started — sending to **${total}** members (${recipients.label}). ETA ~${formatSeconds(secs)}.`,
+      )
+      .catch(() => {});
+  }
+
+  const { sent, failed } = await sendDmsToUsers(
+    recipients.users,
+    body,
+    DM_INTERVAL_MS,
+  );
 
   // Confirm to the executor over DM.
   const failNote =
@@ -135,4 +151,11 @@ export async function handlePrefixMessage(message: Message): Promise<void> {
     .catch((err) => {
       logger.debug({ err }, "Failed to DM executor with ?n confirmation");
     });
+}
+
+function formatSeconds(s: number): string {
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem === 0 ? `${m}m` : `${m}m ${rem}s`;
 }

@@ -15,7 +15,8 @@ export interface DmResult {
   total: number;
 }
 
-export const MAX_RECIPIENTS = 50;
+export const DM_INTERVAL_MS = 1500;
+export const MAX_RECIPIENTS_HARD_CAP = 5000;
 
 /**
  * Resolve a target (user, role, or everyone) to a deduped map of users.
@@ -69,15 +70,23 @@ export async function resolveDmRecipients(
   throw new Error("No DM target provided.");
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
- * Send a message to every user in the map. Returns sent/failed counts.
+ * Send a message to every user in the map with a delay between sends so we
+ * don't trip Discord's per-bot DM rate limits. Returns sent/failed counts.
  */
 export async function sendDmsToUsers(
   users: Map<string, User>,
   content: string,
+  intervalMs: number = DM_INTERVAL_MS,
 ): Promise<{ sent: number; failed: number }> {
   let sent = 0;
   let failed = 0;
+  let i = 0;
+  const total = users.size;
   for (const user of users.values()) {
     try {
       await user.send(content);
@@ -86,6 +95,16 @@ export async function sendDmsToUsers(
       failed++;
       logger.debug({ err, userId: user.id }, "DM failed");
     }
+    i++;
+    if (i < total && intervalMs > 0) await sleep(intervalMs);
   }
   return { sent, failed };
+}
+
+/**
+ * Estimate of how long a DM run will take, in seconds.
+ */
+export function estimateDmSeconds(count: number, intervalMs = DM_INTERVAL_MS): number {
+  if (count <= 1) return 0;
+  return Math.round(((count - 1) * intervalMs) / 1000);
 }

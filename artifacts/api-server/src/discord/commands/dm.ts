@@ -1,6 +1,5 @@
 import {
   SlashCommandBuilder,
-  PermissionFlagsBits,
   type ChatInputCommandInteraction,
   type GuildMember,
   type User,
@@ -9,7 +8,9 @@ import {
 import type { SlashCommand } from "../types";
 import { ensureWhitelisted } from "../utils/gate";
 import {
-  MAX_RECIPIENTS,
+  DM_INTERVAL_MS,
+  MAX_RECIPIENTS_HARD_CAP,
+  estimateDmSeconds,
   resolveDmRecipients,
   sendDmsToUsers,
   type DmTarget,
@@ -38,7 +39,6 @@ const command: SlashCommand = {
         .setDescription("DM every non-bot member of the server")
         .setRequired(false),
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!(await ensureWhitelisted(interaction, "dm"))) return;
@@ -88,14 +88,26 @@ const command: SlashCommand = {
       return;
     }
 
-    if (recipients.users.size > MAX_RECIPIENTS) {
+    if (recipients.users.size > MAX_RECIPIENTS_HARD_CAP) {
       await interaction.editReply(
-        `This would DM **${recipients.users.size}** members. To prevent abuse, mass-DM is capped at ${MAX_RECIPIENTS} per command. Narrow the target.`,
+        `This would DM **${recipients.users.size}** members, which is over the safety cap of ${MAX_RECIPIENTS_HARD_CAP}. Narrow the target.`,
       );
       return;
     }
 
-    const { sent, failed } = await sendDmsToUsers(recipients.users, message);
+    const total = recipients.users.size;
+    const seconds = estimateDmSeconds(total, DM_INTERVAL_MS);
+    if (total > 1) {
+      await interaction.editReply(
+        `📬 Sending to **${total}** member${total === 1 ? "" : "s"} (${recipients.label}). Estimated time: ~${formatSeconds(seconds)}. I'll edit this with the result when I'm done.`,
+      );
+    }
+
+    const { sent, failed } = await sendDmsToUsers(
+      recipients.users,
+      message,
+      DM_INTERVAL_MS,
+    );
     const failNote =
       failed > 0 ? ` Failed for **${failed}** (DMs closed or blocked).` : "";
     await interaction.editReply(
@@ -103,6 +115,13 @@ const command: SlashCommand = {
     );
   },
 };
+
+function formatSeconds(s: number): string {
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem === 0 ? `${m}m` : `${m}m ${rem}s`;
+}
 
 function isUser(t: unknown): t is User {
   return (

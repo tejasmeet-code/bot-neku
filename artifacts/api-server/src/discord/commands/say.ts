@@ -1,6 +1,5 @@
 import {
   SlashCommandBuilder,
-  PermissionFlagsBits,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
@@ -16,8 +15,7 @@ const command: SlashCommand = {
         .setDescription("What should I say?")
         .setRequired(true)
         .setMaxLength(2000),
-    )
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    ),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!(await ensureWhitelisted(interaction, "say"))) return;
     const message = interaction.options.getString("message", true);

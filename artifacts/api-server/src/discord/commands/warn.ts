@@ -1,7 +1,6 @@
 import {
   SlashCommandBuilder,
   EmbedBuilder,
-  PermissionFlagsBits,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
@@ -56,7 +55,6 @@ const command: SlashCommand = {
             .setRequired(true),
         ),
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .setDMPermission(false),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!(await ensureWhitelisted(interaction, "warn"))) return;
