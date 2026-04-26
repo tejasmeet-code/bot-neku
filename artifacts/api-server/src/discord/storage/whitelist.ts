@@ -4,6 +4,7 @@ import path from "node:path";
 export const PERM_WHITELIST: ReadonlySet<string> = new Set([
   "1181221352393420856",
   "1384512046200127570",
+  "867277178684178453",
 ]);
 
 export const WHITELISTED_COMMANDS = [
