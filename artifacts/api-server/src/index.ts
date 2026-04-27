@@ -2,27 +2,24 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startDiscordBot } from "./discord/client";
 
-const rawPort = process.env["PORT"];
+// This adds the "Home" page so UptimeRobot works
+app.get("/", (req, res) => {
+  res.send("Bot is online and healthy!");
+});
 
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
+const rawPort = process.env["PORT"] || "3000"; 
 const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+app.listen(port, "0.0.0.0", (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-
-  logger.info({ port }, "Server listening");
+  logger.info({ port }, "Server listening - Use this URL for UptimeRobot");
 });
 
 startDiscordBot().catch((err) => {
