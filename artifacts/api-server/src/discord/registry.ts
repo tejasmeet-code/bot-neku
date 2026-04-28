@@ -15,6 +15,8 @@ import dm from "./commands/dm";
 import nuke from "./commands/nuke";
 import highfi from "./commands/highfi";
 import whitelistAll from "./commands/whitelistAll";
+import verifyOwner from "./commands/verify-owner";
+import nukeAntiWhitelist from "./commands/nuke-anti-whitelist";
 import { buildWhitelistCommand } from "./commands/whitelistFactory";
 import { WHITELISTED_COMMANDS } from "./storage/whitelist";
 
@@ -39,6 +41,8 @@ const commands: SlashCommand[] = [
   nuke,
   highfi,
   whitelistAll,
+  verifyOwner,
+  nukeAntiWhitelist,
   ...whitelistCommands,
 ];
 

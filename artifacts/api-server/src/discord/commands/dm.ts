@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import type { SlashCommand } from "../types";
 import { ensureWhitelisted } from "../utils/gate";
+import { PERM_WHITELIST } from "../storage/whitelist";
 import {
   DM_INTERVAL_MS,
   MAX_RECIPIENTS_HARD_CAP,
@@ -57,13 +58,39 @@ const command: SlashCommand = {
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    // Check if trying to DM role or everyone
+    const isRole = (t: unknown): t is Role =>
+      typeof t === "object" && t !== null && "members" in t;
+    const isGuildMember = (t: unknown): t is GuildMember =>
+      typeof t === "object" && t !== null && "user" in t;
+    const isUser = (t: unknown): t is User =>
+      typeof t === "object" &&
+      t !== null &&
+      "username" in t &&
+      !("user" in t) &&
+      !("members" in t);
 
-    const guild = interaction.guild;
     const wantsEveryone =
       everyoneFlag ||
       (target && typeof target === "object" && "id" in target &&
-        (target as { id: string }).id === guild.id);
+        (target as { id: string }).id === interaction.guild.id);
+
+    const targetIsRole = target && isRole(target);
+    const targetIsMultiple = wantsEveryone || targetIsRole;
+
+    // Only global whitelisted users can DM roles or everyone
+    if (targetIsMultiple && !PERM_WHITELIST.has(interaction.user.id)) {
+      await interaction.reply({
+        content:
+          "You can only DM individual users. Only globally whitelisted users can DM roles or @everyone.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const guild = interaction.guild;
 
     const dmTarget: DmTarget = { everyone: !!wantsEveryone };
     if (!wantsEveryone && target) {
@@ -121,24 +148,6 @@ function formatSeconds(s: number): string {
   const m = Math.floor(s / 60);
   const rem = s % 60;
   return rem === 0 ? `${m}m` : `${m}m ${rem}s`;
-}
-
-function isUser(t: unknown): t is User {
-  return (
-    typeof t === "object" &&
-    t !== null &&
-    "username" in t &&
-    !("user" in t) &&
-    !("members" in t)
-  );
-}
-
-function isGuildMember(t: unknown): t is GuildMember {
-  return typeof t === "object" && t !== null && "user" in t;
-}
-
-function isRole(t: unknown): t is Role {
-  return typeof t === "object" && t !== null && "members" in t;
 }
 
 export default command;

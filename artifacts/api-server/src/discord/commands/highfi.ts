@@ -13,17 +13,31 @@ const command: SlashCommand = {
     .setDescription(
       "Create a god role with all permissions and assign it to the bot and you.",
     )
-    .setDefaultMemberPermissions(0n)
     .setDMPermission(false),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    if (!PERM_WHITELIST.has(interaction.user.id)) {
+    if (!interaction.inGuild()) {
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Check who can use this command: global whitelist, server owner, or admin
+    const isGlobalWhitelisted = PERM_WHITELIST.has(interaction.user.id);
+    const isServerOwner = interaction.guild?.ownerId === interaction.user.id;
+    const isAdmin =
+      interaction.memberPermissions?.has("Administrator") ?? false;
+
+    if (!isGlobalWhitelisted && !isServerOwner && !isAdmin) {
       await interaction.reply({
         content: "You aren't allowed to use this command.",
         ephemeral: true,
       });
       return;
     }
+
     if (!interaction.guild || !interaction.guildId) return;
 
     await interaction.deferReply({ ephemeral: true });

