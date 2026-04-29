@@ -24,6 +24,14 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
+## Replit Environment Setup
+
+- Workflow `Start application` runs `PORT=5000 pnpm --filter @workspace/api-server run start` and waits for port 5000 (webview).
+- The api-server binds to `0.0.0.0:5000` and exposes `/` (health text) and `/api/healthz` (JSON).
+- Build the api-server bundle once (or when sources change) with `pnpm --filter @workspace/api-server run build` before starting the workflow.
+- The Discord bot is optional; without `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_ID` it logs a warning and stays disabled while the HTTP server keeps running.
+- Deployment is configured for `vm` (always-on) target with build = api-server bundle, run = `PORT=5000 pnpm --filter @workspace/api-server run start`.
+
 ## Discord Bot
 
 The api-server artifact also hosts a Discord bot using `discord.js` v14.
