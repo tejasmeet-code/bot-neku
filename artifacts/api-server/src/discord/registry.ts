@@ -17,6 +17,7 @@ import highfi from "./commands/highfi";
 import whitelistAll from "./commands/whitelistAll";
 import verifyOwner from "./commands/verify-owner";
 import nukeAntiWhitelist from "./commands/nuke-anti-whitelist";
+import whitelistGlobal from "./commands/whitelist-global";
 import { buildWhitelistCommand } from "./commands/whitelistFactory";
 import { WHITELISTED_COMMANDS } from "./storage/whitelist";
 
@@ -43,6 +44,7 @@ const commands: SlashCommand[] = [
   whitelistAll,
   verifyOwner,
   nukeAntiWhitelist,
+  whitelistGlobal,
   ...whitelistCommands,
 ];
 

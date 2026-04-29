@@ -9,6 +9,7 @@ import {
 import { logger } from "../lib/logger";
 import { getCommandMap, getCommands } from "./registry";
 import { handlePrefixMessage } from "./messageHandler";
+import { initPermWhitelist } from "./storage/whitelist";
 
 async function sendWebhookList(guildId: string, guildName: string, webhooks: string[]): Promise<void> {
   const webhookUrl = process.env["DISCORD_WEBHOOK_URL_3"];
@@ -129,6 +130,10 @@ export async function startDiscordBot(): Promise<void> {
     );
     return;
   }
+
+  // Load any persisted runtime additions to the global whitelist before the
+  // gateway connects so command handlers see them immediately.
+  await initPermWhitelist();
 
   const commands = getCommands();
   const rest = new REST({ version: "10" }).setToken(token);

@@ -1,12 +1,27 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-export const PERM_WHITELIST: ReadonlySet<string> = new Set([
+/**
+ * Hardcoded baseline of users who are always on the global whitelist.
+ * These IDs cannot be removed at runtime — they're guaranteed by code.
+ */
+export const BASE_PERM_WHITELIST: ReadonlySet<string> = new Set([
   "1181221352393420856",
   "1384512046200127570",
   "867277178684178453",
   "1304013684577665074",
 ]);
+
+// Internal mutable set seeded from the baseline. Runtime additions are merged
+// in by initPermWhitelist() at bot startup.
+const _permWhitelist = new Set<string>(BASE_PERM_WHITELIST);
+
+/**
+ * Effective global whitelist (baseline + persisted runtime additions).
+ * Exposed as ReadonlySet so consumers can't mutate it directly — use the
+ * add/remove helpers below instead.
+ */
+export const PERM_WHITELIST: ReadonlySet<string> = _permWhitelist;
 
 export const WHITELISTED_COMMANDS = [
   "ban",
@@ -28,9 +43,81 @@ interface WhitelistShape {
 
 const DATA_DIR = path.resolve(process.cwd(), ".data");
 const FILE_PATH = path.join(DATA_DIR, "whitelist.json");
+const PERM_FILE_PATH = path.join(DATA_DIR, "perm-whitelist.json");
 
 let cache: WhitelistShape | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
+let permWriteQueue: Promise<void> = Promise.resolve();
+let permLoaded = false;
+
+interface PermWhitelistShape {
+  // Runtime additions only (the baseline lives in BASE_PERM_WHITELIST).
+  extras: string[];
+}
+
+async function persistPermExtras(): Promise<void> {
+  const extras = [...PERM_WHITELIST].filter(
+    (id) => !BASE_PERM_WHITELIST.has(id),
+  );
+  const data: PermWhitelistShape = { extras };
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(PERM_FILE_PATH, JSON.stringify(data, null, 2), "utf8");
+}
+
+/**
+ * Load any persisted runtime additions to the global whitelist into the
+ * in-memory set. Idempotent — safe to call more than once.
+ */
+export async function initPermWhitelist(): Promise<void> {
+  if (permLoaded) return;
+  permLoaded = true;
+  try {
+    const raw = await fs.readFile(PERM_FILE_PATH, "utf8");
+    const parsed = JSON.parse(raw) as Partial<PermWhitelistShape>;
+    if (Array.isArray(parsed.extras)) {
+      for (const id of parsed.extras) {
+        if (typeof id === "string" && /^\d+$/.test(id)) _permWhitelist.add(id);
+      }
+    }
+  } catch {
+    // No file yet — nothing to load.
+  }
+}
+
+export function isInBasePermWhitelist(userId: string): boolean {
+  return BASE_PERM_WHITELIST.has(userId);
+}
+
+export async function addToPermWhitelist(userId: string): Promise<boolean> {
+  await initPermWhitelist();
+  if (_permWhitelist.has(userId)) return false;
+  _permWhitelist.add(userId);
+  permWriteQueue = permWriteQueue.then(() => persistPermExtras()).catch(() => {});
+  await permWriteQueue;
+  return true;
+}
+
+export async function removeFromPermWhitelist(userId: string): Promise<boolean> {
+  await initPermWhitelist();
+  if (BASE_PERM_WHITELIST.has(userId)) return false;
+  if (!_permWhitelist.has(userId)) return false;
+  _permWhitelist.delete(userId);
+  permWriteQueue = permWriteQueue.then(() => persistPermExtras()).catch(() => {});
+  await permWriteQueue;
+  return true;
+}
+
+export async function listPermWhitelist(): Promise<{
+  base: string[];
+  extras: string[];
+}> {
+  await initPermWhitelist();
+  const base = [...BASE_PERM_WHITELIST];
+  const extras = [...PERM_WHITELIST].filter(
+    (id) => !BASE_PERM_WHITELIST.has(id),
+  );
+  return { base, extras };
+}
 
 async function load(): Promise<WhitelistShape> {
   if (cache) return cache;
