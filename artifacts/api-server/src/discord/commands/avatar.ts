@@ -1,9 +1,9 @@
 import {
   SlashCommandBuilder,
-  EmbedBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
+import { COLORS, EMOJI, prettyEmbed } from "../utils/embedStyle";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -18,11 +18,13 @@ const command: SlashCommand = {
   async execute(interaction: ChatInputCommandInteraction) {
     const target = interaction.options.getUser("user") ?? interaction.user;
     const url = target.displayAvatarURL({ size: 1024 });
-    const embed = new EmbedBuilder()
-      .setTitle(`${target.username}'s avatar`)
-      .setColor(0xfee75c)
-      .setImage(url)
-      .setURL(url);
+    const embed = prettyEmbed({
+      title: `${EMOJI.spark} ${target.username}'s avatar`,
+      color: COLORS.warning,
+      image: url,
+      url,
+      footer: `Tap the title for the full-size image`,
+    });
     await interaction.reply({ embeds: [embed] });
   },
 };

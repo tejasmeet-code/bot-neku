@@ -97,7 +97,10 @@ const command: SlashCommand = {
         color: 0xfaa61a,
         footer: `Active strikes: ${active.length} • Total entries: ${infractions.length}`,
       });
-      await interaction.reply({ embeds: [embed] });
+      await interaction.reply({
+        embeds: [embed],
+        allowedMentions: { parse: [] },
+      });
       return;
     }
 
@@ -149,7 +152,10 @@ const command: SlashCommand = {
             : []),
         ],
       });
-      await interaction.reply({ embeds: [embed] });
+      await interaction.reply({
+        embeds: [embed],
+        allowedMentions: { parse: [] },
+      });
 
       // 3 active strikes => auto-demotion (mirrored to the connected server).
       if (type === "strike" && member) {
@@ -199,7 +205,9 @@ const command: SlashCommand = {
             ],
             footer: "Active strike chain reset after escalation.",
           });
-          await interaction.followUp({ embeds: [autoEmbed] }).catch(() => {});
+          await interaction
+            .followUp({ embeds: [autoEmbed], allowedMentions: { parse: [] } })
+            .catch(() => {});
         }
       }
       return;
@@ -215,9 +223,10 @@ const command: SlashCommand = {
         });
         return;
       }
-      await interaction.reply(
-        `🗑️ Removed infraction \`${id}\` (${removed.type}) from <@${target.id}>.`,
-      );
+      await interaction.reply({
+        content: `🗑️ Removed infraction \`${id}\` (${removed.type}) from **${target.tag}**.`,
+        allowedMentions: { parse: [] },
+      });
       return;
     }
   },

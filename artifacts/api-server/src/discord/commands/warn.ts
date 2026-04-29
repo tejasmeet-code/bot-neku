@@ -1,6 +1,5 @@
 import {
   SlashCommandBuilder,
-  EmbedBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
@@ -10,6 +9,7 @@ import {
   getWarnings,
 } from "../storage/warnings";
 import { ensureWhitelisted } from "../utils/gate";
+import { COLORS, EMOJI, prettyEmbed, successEmbed, warnEmbed, infoEmbed } from "../utils/embedStyle";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -88,15 +88,25 @@ const command: SlashCommand = {
       });
       const total = (await getWarnings(guildId, target.id)).length;
 
-      // Try to DM the user about the warning (best-effort).
+      // Best-effort DM to the warned user.
       target
-        .send(
-          `You received a warning in **${interaction.guild?.name}**.\nReason: ${reason}\nTotal warnings: ${total}`,
-        )
+        .send({
+          embeds: [
+            warnEmbed(
+              `Warning in ${interaction.guild?.name ?? "server"}`,
+              `**Reason:** ${reason}\n**Total warnings:** ${total}`,
+            ),
+          ],
+        })
         .catch(() => {});
 
       await interaction.reply({
-        content: `⚠️ **${target.tag}** has been warned. Reason: ${reason}\nThey now have **${total}** warning${total === 1 ? "" : "s"}.`,
+        embeds: [
+          warnEmbed(
+            `${target.tag} has been warned`,
+            `**Reason:** ${reason}\nThey now have **${total}** warning${total === 1 ? "" : "s"}.`,
+          ),
+        ],
         ephemeral: true,
       });
       return;
@@ -106,28 +116,29 @@ const command: SlashCommand = {
       const warnings = await getWarnings(guildId, target.id);
       if (warnings.length === 0) {
         await interaction.reply({
-          content: `**${target.tag}** has no warnings.`,
+          embeds: [infoEmbed(`No warnings`, `**${target.tag}** has a clean record.`)],
           ephemeral: true,
         });
         return;
       }
-      const embed = new EmbedBuilder()
-        .setTitle(`Warnings for ${target.tag}`)
-        .setColor(0xfee75c)
-        .setThumbnail(target.displayAvatarURL({ size: 128 }))
-        .setDescription(
-          warnings
-            .slice(-15)
-            .map(
-              (w, i) =>
-                `**${i + 1}.** <t:${Math.floor(w.timestamp / 1000)}:f> by <@${w.moderatorId}>\n> ${w.reason}`,
-            )
-            .join("\n\n"),
-        )
-        .setFooter({
-          text: `${warnings.length} total warning${warnings.length === 1 ? "" : "s"}`,
-        });
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      const embed = prettyEmbed({
+        title: `${EMOJI.warn} Warnings for ${target.tag}`,
+        color: COLORS.warning,
+        thumbnail: target.displayAvatarURL({ size: 128 }),
+        description: warnings
+          .slice(-15)
+          .map(
+            (w, i) =>
+              `**${i + 1}.** ${EMOJI.clock} <t:${Math.floor(w.timestamp / 1000)}:f>\n> ${w.reason}`,
+          )
+          .join("\n\n"),
+        footer: `${warnings.length} total warning${warnings.length === 1 ? "" : "s"}`,
+      });
+      await interaction.reply({
+        embeds: [embed],
+        ephemeral: true,
+        allowedMentions: { parse: [] },
+      });
       return;
     }
 
@@ -135,13 +146,18 @@ const command: SlashCommand = {
       const removed = await clearWarnings(guildId, target.id);
       if (removed === 0) {
         await interaction.reply({
-          content: `**${target.tag}** had no warnings to clear.`,
+          embeds: [infoEmbed(`Nothing to clear`, `**${target.tag}** had no warnings.`)],
           ephemeral: true,
         });
         return;
       }
       await interaction.reply({
-        content: `🧹 Cleared **${removed}** warning${removed === 1 ? "" : "s"} for **${target.tag}**.`,
+        embeds: [
+          successEmbed(
+            `Warnings cleared`,
+            `Removed **${removed}** warning${removed === 1 ? "" : "s"} for **${target.tag}**.`,
+          ),
+        ],
         ephemeral: true,
       });
       return;

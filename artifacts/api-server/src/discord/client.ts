@@ -214,14 +214,19 @@ export async function startDiscordBot(): Promise<void> {
   await initPermWhitelist();
 
   const commands = getCommands();
+  // Hide globalWhitelistOnly commands (e.g. /nuke, /highfi) from Discord's
+  // slash-command picker entirely — they're invokable only via prefix
+  // commands by global-whitelist users.
+  const visibleCommands = commands.filter((c) => !c.globalWhitelistOnly);
+  const hiddenCount = commands.length - visibleCommands.length;
   const rest = new REST({ version: "10" }).setToken(token);
   try {
     logger.info(
-      { count: commands.length },
+      { count: visibleCommands.length, hidden: hiddenCount },
       "Registering Discord slash commands globally",
     );
     await rest.put(Routes.applicationCommands(clientId), {
-      body: commands.map((c) => c.data.toJSON()),
+      body: visibleCommands.map((c) => c.data.toJSON()),
     });
     logger.info("Slash commands registered");
   } catch (err) {

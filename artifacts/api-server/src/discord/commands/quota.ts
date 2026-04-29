@@ -107,7 +107,10 @@ const command: SlashCommand = {
             : []),
         ],
       });
-      await interaction.reply({ embeds: [embed] });
+      await interaction.reply({
+        embeds: [embed],
+        allowedMentions: { parse: [] },
+      });
       return;
     }
 
@@ -146,19 +149,23 @@ const command: SlashCommand = {
           w.modActions >= cfg.quotaConfig.modActions;
         if (ok) met++;
         rows.push(
-          `${ok ? "✅" : "❌"} <@${m.id}> — msgs **${w.messages}/${cfg.quotaConfig.messages}**, mod **${w.modActions}/${cfg.quotaConfig.modActions}**`,
+          `${ok ? "✅" : "❌"} **${m.displayName}** — msgs **${w.messages}/${cfg.quotaConfig.messages}**, mod **${w.modActions}/${cfg.quotaConfig.modActions}**`,
         );
       }
       const embed = {
         title: `📊 Weekly Quota — ${interaction.guild.name}`,
         description: rows.length > 0 ? rows.slice(0, 40).join("\n") : "*No staff members.*",
         color: 0x5865f2,
+        thumbnail: { url: interaction.guild.iconURL({ size: 256 }) ?? "" },
         footer: {
-          text: `${met}/${staffMembers.size} on track this week`,
+          text: `📈 ${met}/${staffMembers.size} on track this week`,
         },
         timestamp: new Date().toISOString(),
       };
-      await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({
+        embeds: [embed],
+        allowedMentions: { parse: [] },
+      });
       return;
     }
   },

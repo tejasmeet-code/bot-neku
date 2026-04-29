@@ -123,13 +123,17 @@ const command: SlashCommand = {
     const embed = buildStaffEmbed({
       title: "👤 Staff Profile",
       target,
-      color: 0x5865f2,
+      color: 0x9b59b6,
       fields,
       footer: profile
-        ? `Joined staff <t:${Math.floor(profile.firstJoinedAt / 1000)}:D>`
+        ? `Joined staff • ${new Date(profile.firstJoinedAt).toUTCString()}`
         : "No staff record yet.",
     });
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({
+      embeds: [embed],
+      // Avoid pinging roles/users referenced in the profile fields.
+      allowedMentions: { parse: [] },
+    });
   },
 };
 

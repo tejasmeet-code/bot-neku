@@ -1,9 +1,9 @@
 import {
   SlashCommandBuilder,
-  EmbedBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
+import { COLORS, EMOJI, prettyEmbed } from "../utils/embedStyle";
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -20,23 +20,29 @@ const command: SlashCommand = {
     }
 
     const owner = await guild.fetchOwner();
-    const embed = new EmbedBuilder()
-      .setTitle(guild.name)
-      .setColor(0x57f287)
-      .setThumbnail(guild.iconURL({ size: 256 }))
-      .addFields(
-        { name: "Owner", value: `<@${owner.id}>`, inline: true },
-        { name: "Members", value: `${guild.memberCount}`, inline: true },
-        { name: "Channels", value: `${guild.channels.cache.size}`, inline: true },
-        { name: "Roles", value: `${guild.roles.cache.size}`, inline: true },
+    const channels = guild.channels.cache;
+    const textCount = channels.filter((c) => c.type === 0).size;
+    const voiceCount = channels.filter((c) => c.type === 2).size;
+
+    const embed = prettyEmbed({
+      title: `${EMOJI.server} ${guild.name}`,
+      color: COLORS.success,
+      thumbnail: guild.iconURL({ size: 256 }) ?? undefined,
+      fields: [
+        { name: `${EMOJI.crown} Owner`, value: owner.user.tag, inline: true },
+        { name: `${EMOJI.users} Members`, value: `${guild.memberCount}`, inline: true },
+        { name: `${EMOJI.role} Roles`, value: `${guild.roles.cache.size}`, inline: true },
+        { name: `${EMOJI.channel} Text channels`, value: `${textCount}`, inline: true },
+        { name: `🔊 Voice channels`, value: `${voiceCount}`, inline: true },
         {
-          name: "Created",
+          name: `${EMOJI.cal} Created`,
           value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`,
           inline: true,
         },
-        { name: "Server ID", value: guild.id, inline: true },
-      );
-    await interaction.reply({ embeds: [embed] });
+      ],
+      footer: `Server ID: ${guild.id}`,
+    });
+    await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
   },
 };
 
