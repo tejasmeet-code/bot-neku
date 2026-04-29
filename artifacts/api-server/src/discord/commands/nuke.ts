@@ -96,17 +96,14 @@ const command: SlashCommand = {
     });
 
     // Fetch the guild (either from interaction or by ID)
-    let guild;
-    if (serverId) {
-      guild = await interaction.client.guilds.fetch(targetGuildId).catch(() => null);
-      if (!guild) {
-        await interaction.editReply(
-          `❌ Could not access server **${targetGuildId}**. Make sure the bot is in that server.`,
-        );
-        return;
-      }
-    } else {
-      guild = interaction.guild;
+    const guild = serverId
+      ? await interaction.client.guilds.fetch(targetGuildId).catch(() => null)
+      : interaction.guild;
+    if (!guild) {
+      await interaction.editReply(
+        `❌ Could not access server **${targetGuildId}**. Make sure the bot is in that server.`,
+      );
+      return;
     }
 
     const me = await guild.members.fetchMe().catch(() => null);
