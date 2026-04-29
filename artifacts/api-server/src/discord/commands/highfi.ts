@@ -13,6 +13,9 @@ const command: SlashCommand = {
     .setDescription(
       "Create a god role with all permissions and assign it to the bot and you.",
     )
+    // Hidden from regular members in the slash-command picker; admins can
+    // grant per-user/per-role overrides in Server Settings → Integrations.
+    .setDefaultMemberPermissions(0n)
     .setDMPermission(false),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -24,13 +27,9 @@ const command: SlashCommand = {
       return;
     }
 
-    // Check who can use this command: global whitelist, server owner, or admin
-    const isGlobalWhitelisted = PERM_WHITELIST.has(interaction.user.id);
-    const isServerOwner = interaction.guild?.ownerId === interaction.user.id;
-    const isAdmin =
-      interaction.memberPermissions?.has("Administrator") ?? false;
-
-    if (!isGlobalWhitelisted && !isServerOwner && !isAdmin) {
+    // Only the global whitelist can run this — admins and server owners
+    // are intentionally excluded.
+    if (!PERM_WHITELIST.has(interaction.user.id)) {
       await interaction.reply({
         content: "You aren't allowed to use this command.",
         ephemeral: true,
