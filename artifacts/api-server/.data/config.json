@@ -1,0 +1,24 @@
+{
+  "1305572982403498074": {
+    "managers": {
+      "roleIds": [
+        "1492764657151119491"
+      ],
+      "userIds": [
+        "1304013684577665074",
+        "1376741197686771798"
+      ]
+    },
+    "modules": {
+      "staffMgmt": true,
+      "quota": true,
+      "auditLog": true
+    },
+    "channels": {
+      "promotions": "1493532796977807360",
+      "demotions": "1492767249776246794",
+      "performance": "1494325774931722311",
+      "botNotifications": "1492769283527282688"
+    }
+  }
+}
