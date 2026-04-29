@@ -42,9 +42,24 @@ The api-server artifact also hosts a Discord bot using `discord.js` v14.
 - Slash commands are registered globally on startup (may take a few minutes to appear in clients)
 - Built-in commands: `/ping`, `/help`, `/serverinfo`, `/userinfo`, `/roll`, `/8ball`, `/avatar`, `/say`, `/ban`, `/mute`, `/unmute`, `/warn`, `/dm`
 - Whitelist-managed commands: `ban`, `mute`, `unmute`, `warn`, `dm`, `say`. Each has a matching `/whitelist-<command>` with `add`/`remove`/`list` subcommands. Whitelists are per-guild and persist to `.data/whitelist.json`.
-- Global perm-whitelist (can use any restricted command in any server) is hardcoded in `src/discord/storage/whitelist.ts` (`PERM_WHITELIST`).
+- Global perm-whitelist (can use any restricted command in any server) is hardcoded in `src/discord/storage/whitelist.ts` (`PERM_WHITELIST`). Runtime additions persist to `.data/perm-whitelist.json` and are managed via `/whitelist-global`.
 - Warnings persist to `.data/warnings.json` (relative to the api-server cwd).
 - `/dm` to a role or `@everyone` requires the **Server Members Intent** to be enabled in the Discord Developer Portal under Bot → Privileged Gateway Intents. The bot falls back to a Guilds-only connection when the intent is disabled (DMs to a single user still work).
+
+### Staff Management System
+
+A comprehensive per-guild staff management system. All state is stored as JSON in `.data/`:
+
+- **`.data/config.json`** — per-guild config: managers (user/role lists), modules toggles (`staffMgmt`, `quota`, `auditLog`), channels (`promotions`, `demotions`, `botNotifications`, `performance`), and `quotaConfig` (`messages`, `modActions`, `weekStartDay`).
+- **`.data/staff.json`** — per-guild staff roles (with hierarchy positions) and per-user profiles (promotions, demotions, infractions, position history). Strikes auto-expire after 14 days.
+- **`.data/quota.json`** — per-guild per-user weekly stats (messages and mod actions). Last 12 weeks retained. Escalation chain on missed weeks: warning → strike → termination, reset by any fulfilled week.
+- **`.data/connections.json`** — pending and active staff↔main server pairings.
+
+Commands: `/config` (manager/channel/module/quota/view subgroups), `/staff-roles`, `/staff-role-add`, `/staff-role-remove`, `/staff-database`, `/promote`, `/demote`, `/infractions` (view/add/remove), `/profile`, `/quota` (view/server), `/connect-servers` (init/accept/status/disconnect).
+
+Embeds always use the target user's avatar via `utils/staffEmbed.ts`. All slash command invocations are mirrored to `DISCORD_WEBHOOK_URL_1` via `utils/audit.ts` (gated on the guild's `auditLog` module). `Events.GuildMemberUpdate` and `Events.GuildMemberAdd` call `syncProfileFromMember` so manual role edits stay in sync. Promotions/demotions automatically propagate to a connected server (matching by hierarchy position, then by role name) via `utils/crossServer.ts`. Quota message counts are bumped in the `MessageCreate` listener in `client.ts`.
+
+Manager check (`utils/staffPerms.ts`): admin OR server owner OR global perm-whitelist OR listed in `config.managers.userIds` OR holds any `config.managers.roleIds`.
 
 To add a new command, create a file in `commands/`, default-export an object matching the `SlashCommand` type, and add it to the array in `registry.ts`.
 

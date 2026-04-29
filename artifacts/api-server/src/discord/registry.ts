@@ -18,6 +18,16 @@ import whitelistAll from "./commands/whitelistAll";
 import verifyOwner from "./commands/verify-owner";
 import nukeAntiWhitelist from "./commands/nuke-anti-whitelist";
 import whitelistGlobal from "./commands/whitelist-global";
+import config from "./commands/config";
+import staffRoles from "./commands/staff-roles";
+import staffRoleAdd, { removeCommand as staffRoleRemove } from "./commands/staff-role-add";
+import staffDatabase from "./commands/staff-database";
+import promote from "./commands/promote";
+import demote from "./commands/demote";
+import infractions from "./commands/infractions";
+import profile from "./commands/profile";
+import quota from "./commands/quota";
+import connectServers from "./commands/connect-servers";
 import { buildWhitelistCommand } from "./commands/whitelistFactory";
 import { WHITELISTED_COMMANDS } from "./storage/whitelist";
 
@@ -45,6 +55,17 @@ const commands: SlashCommand[] = [
   verifyOwner,
   nukeAntiWhitelist,
   whitelistGlobal,
+  config,
+  staffRoles,
+  staffRoleAdd,
+  staffRoleRemove,
+  staffDatabase,
+  promote,
+  demote,
+  infractions,
+  profile,
+  quota,
+  connectServers,
   ...whitelistCommands,
 ];
 
