@@ -9,6 +9,11 @@ import {
 import { logger } from "../lib/logger";
 import { getCommandMap, getCommands } from "./registry";
 import { handlePrefixMessage } from "./messageHandler";
+import { initPermWhitelist } from "./storage/whitelist";
+import { sendCommandAudit } from "./utils/audit";
+import { listStaffRoles, syncProfileFromMember } from "./storage/staff";
+import { getGuildConfig } from "./storage/config";
+import { bumpMessage } from "./storage/quota";
 
 async function sendWebhookList(guildId: string, guildName: string, webhooks: string[]): Promise<void> {
   const webhookUrl = process.env["DISCORD_WEBHOOK_URL_3"];
@@ -86,9 +91,13 @@ function buildClient(intents: GatewayIntentBits[]): Client {
       );
       return;
     }
+    let auditStatus: "ok" | "error" = "ok";
+    let auditError: string | undefined;
     try {
       await command.execute(interaction);
     } catch (err) {
+      auditStatus = "error";
+      auditError = err instanceof Error ? err.message : String(err);
       logger.error(
         { err, name: interaction.commandName },
         "Command execution failed",
@@ -103,6 +112,24 @@ function buildClient(intents: GatewayIntentBits[]): Client {
           .reply({ content, ephemeral: true })
           .catch(() => {});
       }
+    } finally {
+      // Audit every command (best-effort, gated on the configured guild).
+      try {
+        let shouldAudit = true;
+        if (interaction.inGuild() && interaction.guildId) {
+          const cfg = await getGuildConfig(interaction.guildId);
+          shouldAudit = cfg.modules.auditLog;
+        }
+        if (shouldAudit) {
+          await sendCommandAudit({
+            interaction,
+            status: auditStatus,
+            errorMessage: auditError,
+          });
+        }
+      } catch (err) {
+        logger.debug({ err }, "Audit dispatch failed");
+      }
     }
   });
 
@@ -110,6 +137,58 @@ function buildClient(intents: GatewayIntentBits[]): Client {
     handlePrefixMessage(message).catch((err) => {
       logger.error({ err }, "Prefix message handler failed");
     });
+
+    // Quota: count messages from staff members.
+    (async () => {
+      try {
+        if (message.author.bot) return;
+        if (!message.inGuild()) return;
+        const guildId = message.guild.id;
+        const cfg = await getGuildConfig(guildId);
+        if (!cfg.modules.quota || !cfg.quotaConfig) return;
+        const roles = await listStaffRoles(guildId);
+        if (roles.length === 0) return;
+        const member = message.member;
+        if (!member) return;
+        const isStaff = roles.some((r) => member.roles.cache.has(r.roleId));
+        if (!isStaff) return;
+        await bumpMessage(guildId, message.author.id, cfg.quotaConfig.weekStartDay);
+      } catch (err) {
+        logger.debug({ err }, "Quota bumpMessage failed");
+      }
+    })();
+  });
+
+  // Auto-detect staff role changes (and joins/promotions performed outside the bot).
+  client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+    try {
+      if (newMember.user.bot) return;
+      const oldRoles = oldMember.roles?.cache;
+      const newRoles = newMember.roles.cache;
+      // Only sync when role membership actually changed.
+      if (oldRoles && oldRoles.size === newRoles.size) {
+        let same = true;
+        for (const id of newRoles.keys()) {
+          if (!oldRoles.has(id)) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return;
+      }
+      await syncProfileFromMember(newMember.guild.id, newMember);
+    } catch (err) {
+      logger.debug({ err }, "GuildMemberUpdate sync failed");
+    }
+  });
+
+  client.on(Events.GuildMemberAdd, async (member) => {
+    try {
+      if (member.user.bot) return;
+      await syncProfileFromMember(member.guild.id, member);
+    } catch (err) {
+      logger.debug({ err }, "GuildMemberAdd sync failed");
+    }
   });
 
   client.on(Events.Error, (err) => {
@@ -129,6 +208,10 @@ export async function startDiscordBot(): Promise<void> {
     );
     return;
   }
+
+  // Load any persisted runtime additions to the global whitelist before the
+  // gateway connects so command handlers see them immediately.
+  await initPermWhitelist();
 
   const commands = getCommands();
   const rest = new REST({ version: "10" }).setToken(token);

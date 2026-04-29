@@ -10,10 +10,13 @@ import { ensureWhitelisted } from "../utils/gate";
 import { PERM_WHITELIST } from "../storage/whitelist";
 import {
   DM_INTERVAL_MS,
+  DM_GROUP_SIZE,
   MAX_RECIPIENTS_HARD_CAP,
   estimateDmSeconds,
+  estimateGroupedDmSeconds,
   resolveDmRecipients,
   sendDmsToUsers,
+  sendDmsInGroups,
   type DmTarget,
 } from "../utils/dmCore";
 
@@ -123,18 +126,21 @@ const command: SlashCommand = {
     }
 
     const total = recipients.users.size;
-    const seconds = estimateDmSeconds(total, DM_INTERVAL_MS);
+    const seconds = targetIsMultiple
+      ? estimateGroupedDmSeconds(total)
+      : estimateDmSeconds(total, DM_INTERVAL_MS);
     if (total > 1) {
+      const detail = targetIsMultiple
+        ? ` Sending in groups of ${DM_GROUP_SIZE} with a 3–4 minute pause between groups.`
+        : "";
       await interaction.editReply(
-        `📬 Sending to **${total}** member${total === 1 ? "" : "s"} (${recipients.label}). Estimated time: ~${formatSeconds(seconds)}. I'll edit this with the result when I'm done.`,
+        `📬 Sending to **${total}** member${total === 1 ? "" : "s"} (${recipients.label}). Estimated time: ~${formatSeconds(seconds)}.${detail} I'll edit this with the result when I'm done.`,
       );
     }
 
-    const { sent, failed } = await sendDmsToUsers(
-      recipients.users,
-      message,
-      DM_INTERVAL_MS,
-    );
+    const { sent, failed } = targetIsMultiple
+      ? await sendDmsInGroups(recipients.users, message)
+      : await sendDmsToUsers(recipients.users, message, DM_INTERVAL_MS);
     const failNote =
       failed > 0 ? ` Failed for **${failed}** (DMs closed or blocked).` : "";
     await interaction.editReply(

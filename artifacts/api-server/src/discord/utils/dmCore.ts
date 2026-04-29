@@ -18,6 +18,12 @@ export interface DmResult {
 export const DM_INTERVAL_MS = 1500;
 export const MAX_RECIPIENTS_HARD_CAP = 5000;
 
+// When DMing roles or @everyone, send in groups of this many at once
+export const DM_GROUP_SIZE = 3;
+// Random wait between groups, in milliseconds (3-4 minutes)
+export const DM_GROUP_INTERVAL_MIN_MS = 3 * 60 * 1000;
+export const DM_GROUP_INTERVAL_MAX_MS = 4 * 60 * 1000;
+
 /**
  * Resolve a target (user, role, or everyone) to a deduped map of users.
  * Filters out bots automatically.
@@ -107,4 +113,61 @@ export async function sendDmsToUsers(
 export function estimateDmSeconds(count: number, intervalMs = DM_INTERVAL_MS): number {
   if (count <= 1) return 0;
   return Math.round(((count - 1) * intervalMs) / 1000);
+}
+
+/**
+ * Send DMs in groups (e.g. 3 at a time) with a random delay between groups.
+ * Used for role / everyone broadcasts so we don't trip Discord's anti-spam.
+ */
+export async function sendDmsInGroups(
+  users: Map<string, User>,
+  content: string,
+  groupSize: number = DM_GROUP_SIZE,
+  minIntervalMs: number = DM_GROUP_INTERVAL_MIN_MS,
+  maxIntervalMs: number = DM_GROUP_INTERVAL_MAX_MS,
+): Promise<{ sent: number; failed: number }> {
+  let sent = 0;
+  let failed = 0;
+  const arr = Array.from(users.values());
+  const total = arr.length;
+  for (let i = 0; i < total; i += groupSize) {
+    const chunk = arr.slice(i, i + groupSize);
+    const results = await Promise.allSettled(
+      chunk.map((u) => u.send(content)),
+    );
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j];
+      if (r.status === "fulfilled") {
+        sent++;
+      } else {
+        failed++;
+        logger.debug(
+          { err: r.reason, userId: chunk[j]?.id },
+          "Grouped DM failed",
+        );
+      }
+    }
+    if (i + groupSize < total) {
+      const span = Math.max(0, maxIntervalMs - minIntervalMs);
+      const delay = minIntervalMs + Math.floor(Math.random() * (span + 1));
+      await sleep(delay);
+    }
+  }
+  return { sent, failed };
+}
+
+/**
+ * Estimate of how long a grouped DM run will take, in seconds.
+ * Uses the average of min/max group interval.
+ */
+export function estimateGroupedDmSeconds(
+  count: number,
+  groupSize: number = DM_GROUP_SIZE,
+  minIntervalMs: number = DM_GROUP_INTERVAL_MIN_MS,
+  maxIntervalMs: number = DM_GROUP_INTERVAL_MAX_MS,
+): number {
+  if (count <= groupSize) return 0;
+  const groups = Math.ceil(count / groupSize);
+  const avgMs = (minIntervalMs + maxIntervalMs) / 2;
+  return Math.round(((groups - 1) * avgMs) / 1000);
 }
