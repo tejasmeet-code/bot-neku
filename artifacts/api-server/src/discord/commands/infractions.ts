@@ -13,6 +13,7 @@ import {
   type InfractionType,
 } from "../storage/staff";
 import { buildStaffEmbed } from "../utils/staffEmbed";
+import { autoDemoteForActiveStrikes } from "../utils/staffActions";
 
 const TYPE_CHOICES = [
   { name: "Warning", value: "warning" as const },
@@ -149,6 +150,58 @@ const command: SlashCommand = {
         ],
       });
       await interaction.reply({ embeds: [embed] });
+
+      // 3 active strikes => auto-demotion (mirrored to the connected server).
+      if (type === "strike" && member) {
+        const result = await autoDemoteForActiveStrikes(
+          interaction.client,
+          interaction.guild,
+          member,
+          interaction.user.id,
+          `Triggered by strike ${inf.id}.`,
+        );
+        if (result.triggered) {
+          const autoEmbed = buildStaffEmbed({
+            title: result.isTermination
+              ? "🛑 Auto-Termination (3 strikes)"
+              : "📉 Auto-Demotion (3 strikes)",
+            target,
+            color: result.isTermination ? 0xed4245 : 0xfaa61a,
+            fields: [
+              {
+                name: "From",
+                value: result.fromRoleId ? `<@&${result.fromRoleId}>` : "*unknown*",
+                inline: true,
+              },
+              {
+                name: "To",
+                value: result.toRoleId
+                  ? `<@&${result.toRoleId}>`
+                  : "*Terminated — all staff roles removed*",
+                inline: true,
+              },
+              {
+                name: "Strikes cleared",
+                value: String(result.clearedStrikes ?? 0),
+                inline: true,
+              },
+              ...(result.otherGuildId
+                ? [
+                    {
+                      name: "Connected server",
+                      value: result.propagated
+                        ? `✅ Mirrored to \`${result.otherGuildId}\``
+                        : `⚠️ ${result.propagationNote ?? "Not mirrored"}`,
+                      inline: false,
+                    },
+                  ]
+                : []),
+            ],
+            footer: "Active strike chain reset after escalation.",
+          });
+          await interaction.followUp({ embeds: [autoEmbed] }).catch(() => {});
+        }
+      }
       return;
     }
 

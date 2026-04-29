@@ -17,6 +17,10 @@ import {
 import { getGuildConfig } from "../storage/config";
 import { buildStaffEmbed } from "../utils/staffEmbed";
 import { propagateRoleAssignment } from "../utils/crossServer";
+import {
+  propagateTermination,
+  terminateInGuild,
+} from "../utils/staffActions";
 import { logger } from "../../lib/logger";
 
 const command: SlashCommand = {
@@ -144,12 +148,40 @@ const command: SlashCommand = {
 
     await interaction.deferReply();
 
+    const auditReason = `Demoted by ${interaction.user.tag}${reason ? `: ${reason}` : ""}`;
+    let cross: {
+      propagated: boolean;
+      otherGuildId?: string;
+      note?: string;
+    };
+
     try {
-      await member.roles.remove(heldEntry.roleId, `Demoted by ${interaction.user.tag}`);
-      if (targetEntry) {
-        await member.roles.add(
-          targetEntry.roleId,
-          `Demoted by ${interaction.user.tag}`,
+      if (isTermination) {
+        // Terminate: strip every staff role in this server.
+        await terminateInGuild(guild, member, auditReason);
+        const t = await propagateTermination(
+          interaction.client,
+          guild,
+          member.id,
+          `Termination mirrored from ${guild.name}`,
+        );
+        cross = {
+          propagated: t.propagated,
+          ...(t.otherGuildId !== undefined ? { otherGuildId: t.otherGuildId } : {}),
+          ...(t.note !== undefined ? { note: t.note } : {}),
+        };
+      } else {
+        await member.roles.remove(heldEntry.roleId, auditReason);
+        if (targetEntry) {
+          await member.roles.add(targetEntry.roleId, auditReason);
+        }
+        cross = await propagateRoleAssignment(
+          interaction.client,
+          guild,
+          member.id,
+          targetEntry?.roleId ?? null,
+          heldEntry.roleId,
+          `Demotion mirrored from ${guild.name}`,
         );
       }
     } catch (err) {
@@ -179,15 +211,6 @@ const command: SlashCommand = {
     );
 
     await syncProfileFromMember(interaction.guildId, member);
-
-    const cross = await propagateRoleAssignment(
-      interaction.client,
-      guild,
-      member.id,
-      targetEntry?.roleId ?? null,
-      heldEntry.roleId,
-      `Demotion mirrored from ${guild.name}`,
-    );
 
     const profile = await getProfile(interaction.guildId, member.id);
     const fields = [

@@ -393,3 +393,27 @@ export function activeStrikes(
     return true;
   });
 }
+
+/**
+ * Force-expire every currently active strike on a profile (used after an
+ * auto-demotion so the same strikes don't trigger another demotion). Returns
+ * the number of strikes that were active and got expired.
+ */
+export async function expireActiveStrikes(
+  guildId: string,
+  userId: string,
+): Promise<number> {
+  const data = await load();
+  const profile = data[guildId]?.profiles[userId];
+  if (!profile) return 0;
+  const now = Date.now();
+  let count = 0;
+  for (const inf of profile.infractions) {
+    if (inf.type !== "strike") continue;
+    if (inf.expiresAt && inf.expiresAt <= now) continue;
+    inf.expiresAt = now - 1;
+    count += 1;
+  }
+  if (count > 0) await queueWrite(data);
+  return count;
+}
