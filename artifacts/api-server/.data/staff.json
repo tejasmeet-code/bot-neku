@@ -62,6 +62,72 @@
         "demotions": [],
         "infractions": [],
         "terminated": false
+      },
+      "1467525937120678071": {
+        "userId": "1467525937120678071",
+        "firstJoinedAt": 1777473296982,
+        "currentRoleId": "1492763252453802064",
+        "positionHistory": [
+          {
+            "roleId": "1492763252453802064",
+            "fromAt": 1777473296983,
+            "toAt": 1777473370975
+          },
+          {
+            "roleId": "1492763371429433414",
+            "fromAt": 1777473370975,
+            "toAt": 1777473412610
+          },
+          {
+            "roleId": "1492763252453802064",
+            "fromAt": 1777473412610,
+            "toAt": null
+          }
+        ],
+        "promotions": [
+          {
+            "fromRoleId": "1492763252453802064",
+            "toRoleId": "1492763371429433414",
+            "at": 1777473296982,
+            "byUserId": "1181221352393420856",
+            "reason": "Test"
+          }
+        ],
+        "demotions": [
+          {
+            "fromRoleId": "1492763371429433414",
+            "toRoleId": "1492763252453802064",
+            "at": 1777473370965,
+            "byUserId": "1181221352393420856",
+            "reason": "test done"
+          }
+        ],
+        "infractions": [
+          {
+            "id": "mok5r2ov-9a4ey0",
+            "type": "demotion",
+            "at": 1777473370975,
+            "byUserId": "1181221352393420856",
+            "reason": "test done"
+          }
+        ],
+        "terminated": false
+      },
+      "1304013684577665074": {
+        "userId": "1304013684577665074",
+        "firstJoinedAt": 1777473393333,
+        "currentRoleId": "1492766957601296404",
+        "positionHistory": [
+          {
+            "roleId": "1492766957601296404",
+            "fromAt": 1777473393333,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
       }
     }
   },
@@ -112,6 +178,28 @@
         "position": 11
       }
     ],
-    "profiles": {}
+    "profiles": {
+      "1467525937120678071": {
+        "userId": "1467525937120678071",
+        "firstJoinedAt": 1777473297597,
+        "currentRoleId": "1410607793391796325",
+        "positionHistory": [
+          {
+            "roleId": "1400463465969356853",
+            "fromAt": 1777473297597,
+            "toAt": 1777473370964
+          },
+          {
+            "roleId": "1410607793391796325",
+            "fromAt": 1777473370964,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      }
+    }
   }
 }
