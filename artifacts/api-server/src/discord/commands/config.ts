@@ -7,7 +7,6 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelSelectMenuBuilder,
-  UserSelectMenuBuilder,
   RoleSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
@@ -30,193 +29,264 @@ import {
   removeStaffRole,
 } from "../storage/staff";
 
-type ChannelPurpose =
-  | "promotions"
-  | "demotions"
-  | "botNotifications"
-  | "performance";
-type ModuleName = "staffMgmt" | "quota" | "auditLog";
-
-const CHANNEL_PURPOSES: ChannelPurpose[] = [
-  "promotions",
-  "demotions",
-  "botNotifications",
-  "performance",
-];
-
-const CHANNEL_LABELS: Record<ChannelPurpose, string> = {
-  promotions: "Promotions",
-  demotions: "Demotions",
-  botNotifications: "Bot Notifications",
-  performance: "Performance",
-};
-
-const MODULE_NAMES: ModuleName[] = ["staffMgmt", "quota", "auditLog"];
-
-const MODULE_LABELS: Record<ModuleName, string> = {
-  staffMgmt: "Staff Management",
-  quota: "Quota Tracking",
-  auditLog: "Audit Log",
-};
-
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
 
-function buildOverviewEmbed(c: GuildConfig): EmbedBuilder {
-  return new EmbedBuilder()
-    .setTitle("Server Configuration")
-    .setColor(0x5865f2)
-    .addFields(
-      {
-        name: "Modules",
-        value: MODULE_NAMES.map(
-          (k) => `${c.modules[k] ? "🟢" : "🔴"} ${MODULE_LABELS[k]}`,
-        ).join("\n"),
-        inline: false,
-      },
-      {
-        name: "Channels",
-        value: CHANNEL_PURPOSES.map(
-          (k) =>
-            `**${CHANNEL_LABELS[k]}:** ${
-              c.channels[k] ? `<#${c.channels[k]}>` : "*unset*"
-            }`,
-        ).join("\n"),
-        inline: false,
-      },
-      {
-        name: "Manager users",
-        value:
-          c.managers.userIds.length > 0
-            ? c.managers.userIds.map((id) => `<@${id}>`).join(", ")
-            : "*none*",
-        inline: false,
-      },
-      {
-        name: "Manager roles",
-        value:
-          c.managers.roleIds.length > 0
-            ? c.managers.roleIds.map((id) => `<@&${id}>`).join(", ")
-            : "*none*",
-        inline: false,
-      },
-    )
-    .setFooter({
-      text: "Administrators and the server owner always have access.",
-    });
+interface ModuleDef {
+  id: string;
+  label: string;
+  emoji: string;
+  moduleKey: keyof GuildConfig["modules"];
+  channelKey: keyof GuildConfig["channels"] | null;
+  description: string;
 }
 
-function mainMenu(): Row[] {
-  const row1 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("cfg:modules")
-      .setLabel("Modules")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("cfg:channels")
-      .setLabel("Channels")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("cfg:managers")
-      .setLabel("Managers")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("cfg:quota")
-      .setLabel("Quota")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("cfg:staffRoles")
-      .setLabel("Staff Roles")
-      .setStyle(ButtonStyle.Primary),
-  );
-  const row2 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("cfg:refresh")
-      .setLabel("Refresh")
-      .setStyle(ButtonStyle.Secondary),
+const MODULE_DEFS: ModuleDef[] = [
+  {
+    id: "moderation",
+    label: "Moderation",
+    emoji: "🔨",
+    moduleKey: "moderation",
+    channelKey: "moderation",
+    description: "Ban, mute, jail, and warn actions.",
+  },
+  {
+    id: "infractions",
+    label: "Infractions",
+    emoji: "⚠️",
+    moduleKey: "infractions",
+    channelKey: "infractions",
+    description: "Strike/infraction log channel for warnings.",
+  },
+  {
+    id: "promotions",
+    label: "Promotions/Demotions",
+    emoji: "📈",
+    moduleKey: "staffMgmt",
+    channelKey: "promotions",
+    description: "Promotion and demotion announcements.",
+  },
+  {
+    id: "appeals",
+    label: "Appeals",
+    emoji: "📋",
+    moduleKey: "appeals",
+    channelKey: "appeals",
+    description: "Punishment appeal review channel.",
+  },
+  {
+    id: "staff",
+    label: "Staff",
+    emoji: "👥",
+    moduleKey: "staffMgmt",
+    channelKey: null,
+    description: "Manage staff roles and hierarchy.",
+  },
+  {
+    id: "quota",
+    label: "Quota",
+    emoji: "📊",
+    moduleKey: "quota",
+    channelKey: null,
+    description: "Weekly message and mod-action quota targets.",
+  },
+];
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function mainDropdownRow(): Row {
+  const sel = new StringSelectMenuBuilder()
+    .setCustomId("cfg:module:select")
+    .setPlaceholder("Select a Module to Configure")
+    .addOptions(
+      MODULE_DEFS.map((m) => ({
+        label: m.label,
+        value: m.id,
+        emoji: m.emoji,
+        description: m.description,
+      })),
+    );
+  return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(sel);
+}
+
+function closeRow(): Row {
+  return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("cfg:close")
       .setLabel("Close")
       .setStyle(ButtonStyle.Danger),
   );
-  return [row1, row2];
 }
 
-const WEEKDAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-
-function quotaMenu(c: GuildConfig): Row[] {
-  const setBtn = new ButtonBuilder()
-    .setCustomId("cfg:quotaSet")
-    .setLabel(c.quotaConfig ? "Edit quota" : "Set quota")
-    .setStyle(ButtonStyle.Primary);
-  const dayBtn = new ButtonBuilder()
-    .setCustomId("cfg:quotaDay")
-    .setLabel("Week start day")
-    .setStyle(ButtonStyle.Secondary)
-    .setDisabled(!c.quotaConfig);
-  const clearBtn = new ButtonBuilder()
-    .setCustomId("cfg:quotaClear")
-    .setLabel("Clear quota")
-    .setStyle(ButtonStyle.Danger)
-    .setDisabled(!c.quotaConfig);
-  const row1 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    setBtn,
-    dayBtn,
-    clearBtn,
-  );
-  const back = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+function backRow(): Row {
+  return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId("cfg:back")
-      .setLabel("Back")
+      .setLabel("← Back")
       .setStyle(ButtonStyle.Secondary),
   );
-  return [row1, back];
+}
+
+function buildOverviewEmbed(cfg: GuildConfig): EmbedBuilder {
+  const moduleLines = MODULE_DEFS.map((m) => {
+    const on = cfg.modules[m.moduleKey];
+    return `${on ? "🟢" : "🔴"} **${m.label}**`;
+  });
+  return new EmbedBuilder()
+    .setTitle("⚙️ Server Configuration")
+    .setColor(0x5865f2)
+    .setDescription(
+      "Use the dropdown below to configure a module.\n\n" + moduleLines.join("\n"),
+    )
+    .setFooter({ text: "Administrators always have access." });
+}
+
+function buildModuleEmbed(cfg: GuildConfig, mod: ModuleDef): EmbedBuilder {
+  const enabled = cfg.modules[mod.moduleKey];
+  const channel = mod.channelKey ? cfg.channels[mod.channelKey] : null;
+  const roles = cfg.moduleRoles?.[mod.id] ?? [];
+
+  const e = new EmbedBuilder()
+    .setTitle(`${mod.emoji} ${mod.label}`)
+    .setColor(enabled ? 0x57f287 : 0xed4245)
+    .addFields(
+      { name: "Status", value: enabled ? "🟢 Enabled" : "🔴 Disabled", inline: true },
+    );
+
+  if (mod.channelKey !== null) {
+    e.addFields({
+      name: "Channel",
+      value: channel ? `<#${channel}>` : "*Not set*",
+      inline: true,
+    });
+  }
+
+  e.addFields({
+    name: "Permitted Roles",
+    value: roles.length > 0 ? roles.map((r) => `<@&${r}>`).join(", ") : "*All staff (none set)*",
+    inline: false,
+  });
+
+  return e;
+}
+
+function moduleActionRows(cfg: GuildConfig, mod: ModuleDef): Row[] {
+  const enabled = cfg.modules[mod.moduleKey];
+  const rows: Row[] = [];
+
+  const actionRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`cfg:mod:toggle:${mod.id}`)
+      .setLabel(enabled ? "✅ Enabled — Click to Disable" : "❌ Disabled — Click to Enable")
+      .setStyle(enabled ? ButtonStyle.Success : ButtonStyle.Danger),
+  );
+
+  if (mod.channelKey !== null) {
+    actionRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`cfg:mod:setchannel:${mod.id}`)
+        .setLabel("Set Channel")
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji("📌"),
+    );
+  }
+
+  actionRow.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`cfg:mod:setroles:${mod.id}`)
+      .setLabel("Set Permissions")
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji("🔐"),
+  );
+
+  rows.push(actionRow);
+  rows.push(backRow());
+  return rows;
+}
+
+function channelPickRows(mod: ModuleDef): Row[] {
+  const sel = new ChannelSelectMenuBuilder()
+    .setCustomId(`cfg:mod:channelset:${mod.id}`)
+    .setPlaceholder(`Pick the channel for ${mod.label}`)
+    .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+    .setMinValues(1)
+    .setMaxValues(1);
+
+  const clearRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`cfg:mod:channelclear:${mod.id}`)
+      .setLabel("Clear Channel")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`cfg:mod:view:${mod.id}`)
+      .setLabel("← Back")
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return [
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(sel),
+    clearRow,
+  ];
+}
+
+function rolePickRows(mod: ModuleDef): Row[] {
+  const sel = new RoleSelectMenuBuilder()
+    .setCustomId(`cfg:mod:roleset:${mod.id}`)
+    .setPlaceholder(`Pick permitted roles for ${mod.label}`)
+    .setMinValues(0)
+    .setMaxValues(10);
+
+  const clearRow = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`cfg:mod:roleclear:${mod.id}`)
+      .setLabel("Clear Roles")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`cfg:mod:view:${mod.id}`)
+      .setLabel("← Back")
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return [
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(sel),
+    clearRow,
+  ];
 }
 
 function buildQuotaEmbed(c: GuildConfig): EmbedBuilder {
-  const e = new EmbedBuilder().setTitle("Quota Config").setColor(0x5865f2);
+  const e = new EmbedBuilder().setTitle("📊 Quota Configuration").setColor(0x5865f2);
   if (c.quotaConfig) {
-    e.setDescription(
-      `**Messages / week:** ${c.quotaConfig.messages}\n` +
-        `**Mod actions / week:** ${c.quotaConfig.modActions}\n` +
-        `**Week starts on:** ${WEEKDAYS[c.quotaConfig.weekStartDay] ?? "Sunday"}`,
+    e.addFields(
+      { name: "Messages / week", value: String(c.quotaConfig.messages), inline: true },
+      { name: "Mod actions / week", value: String(c.quotaConfig.modActions), inline: true },
+      { name: "Week starts on", value: WEEKDAYS[c.quotaConfig.weekStartDay] ?? "Sunday", inline: true },
     );
   } else {
-    e.setDescription("Quota is **not set**. Press *Set quota* to define weekly targets.");
+    e.setDescription("Quota is **not configured**. Press *Set Targets* to define weekly goals.");
   }
   return e;
 }
 
-function quotaModal(c: GuildConfig): ModalBuilder {
-  const messages = new TextInputBuilder()
-    .setCustomId("messages")
-    .setLabel("Messages per week (number)")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setValue(String(c.quotaConfig?.messages ?? 50));
-  const modActions = new TextInputBuilder()
-    .setCustomId("modActions")
-    .setLabel("Mod actions per week (number)")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setValue(String(c.quotaConfig?.modActions ?? 5));
-  return new ModalBuilder()
-    .setCustomId("cfg:quotaModal")
-    .setTitle("Set weekly quota")
-    .addComponents(
-      new ActionRowBuilder<TextInputBuilder>().addComponents(messages),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(modActions),
-    );
+function quotaRows(c: GuildConfig): Row[] {
+  const row1 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("cfg:quotaSet")
+      .setLabel(c.quotaConfig ? "Edit Targets" : "Set Targets")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("cfg:quotaDay")
+      .setLabel("Week Start Day")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(!c.quotaConfig),
+    new ButtonBuilder()
+      .setCustomId("cfg:quotaClear")
+      .setLabel("Clear Quota")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!c.quotaConfig),
+  );
+  return [row1, backRow()];
 }
 
-function weekStartMenu(c: GuildConfig): Row[] {
+function weekStartRows(c: GuildConfig): Row[] {
   const sel = new StringSelectMenuBuilder()
     .setCustomId("cfg:quotaDaySet")
     .setPlaceholder("Pick the day the week starts on")
@@ -231,40 +301,60 @@ function weekStartMenu(c: GuildConfig): Row[] {
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(sel),
     new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId("cfg:quota")
-        .setLabel("Back")
+        .setCustomId("cfg:mod:view:quota")
+        .setLabel("← Back")
         .setStyle(ButtonStyle.Secondary),
     ),
   ];
 }
 
-async function staffRolesMenu(guildId: string): Promise<{
-  embed: EmbedBuilder;
-  rows: Row[];
-}> {
+function quotaModal(c: GuildConfig): ModalBuilder {
+  return new ModalBuilder()
+    .setCustomId("cfg:quotaModal")
+    .setTitle("Set Weekly Quota Targets")
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("messages")
+          .setLabel("Messages per week")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setValue(String(c.quotaConfig?.messages ?? 50)),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("modActions")
+          .setLabel("Mod actions per week")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setValue(String(c.quotaConfig?.modActions ?? 5)),
+      ),
+    );
+}
+
+async function staffRolesView(guildId: string): Promise<{ embed: EmbedBuilder; rows: Row[] }> {
   const roles = await listStaffRoles(guildId);
-  const lines = roles
-    .map((r) => `**${r.position}.** <@&${r.roleId}>`)
-    .join("\n");
   const embed = new EmbedBuilder()
-    .setTitle("Staff Roles")
+    .setTitle("👥 Staff Roles")
     .setColor(0x5865f2)
     .setDescription(
       roles.length === 0
         ? "*No staff roles registered yet.* Use the picker below to add one."
-        : lines,
+        : roles.map((r) => `**${r.position}.** <@&${r.roleId}>`).join("\n"),
     );
 
   const addSel = new RoleSelectMenuBuilder()
     .setCustomId("cfg:staffRoleAdd")
-    .setPlaceholder("Add a staff role (appended at the bottom)")
+    .setPlaceholder("Add a staff role")
     .setMinValues(1)
     .setMaxValues(1);
+
   const rmSel = new StringSelectMenuBuilder()
     .setCustomId("cfg:staffRoleRemove")
     .setPlaceholder("Remove a staff role")
     .setMinValues(1)
     .setMaxValues(1);
+
   if (roles.length > 0) {
     rmSel.addOptions(
       roles.slice(0, 25).map((r) => ({
@@ -274,8 +364,7 @@ async function staffRolesMenu(guildId: string): Promise<{
       })),
     );
   } else {
-    rmSel.addOptions({ label: "(no roles)", value: "_noop", default: true });
-    rmSel.setDisabled(true);
+    rmSel.addOptions({ label: "(no roles)", value: "_noop", default: true }).setDisabled(true);
   }
 
   return {
@@ -283,110 +372,9 @@ async function staffRolesMenu(guildId: string): Promise<{
     rows: [
       new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(addSel),
       new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(rmSel),
-      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId("cfg:back")
-          .setLabel("Back")
-          .setStyle(ButtonStyle.Secondary),
-      ),
+      backRow(),
     ],
   };
-}
-
-function modulesMenu(c: GuildConfig): Row[] {
-  const toggles = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    ...MODULE_NAMES.map((m) =>
-      new ButtonBuilder()
-        .setCustomId(`cfg:module:${m}`)
-        .setLabel(`${MODULE_LABELS[m]}: ${c.modules[m] ? "On" : "Off"}`)
-        .setStyle(c.modules[m] ? ButtonStyle.Success : ButtonStyle.Secondary),
-    ),
-  );
-  const back = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("cfg:back")
-      .setLabel("Back")
-      .setStyle(ButtonStyle.Secondary),
-  );
-  return [toggles, back];
-}
-
-function channelsMenu(): Row[] {
-  const buttons = CHANNEL_PURPOSES.map((p) =>
-    new ButtonBuilder()
-      .setCustomId(`cfg:channelPick:${p}`)
-      .setLabel(CHANNEL_LABELS[p])
-      .setStyle(ButtonStyle.Primary),
-  );
-  const row = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    ...buttons,
-  );
-  const back = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("cfg:back")
-      .setLabel("Back")
-      .setStyle(ButtonStyle.Secondary),
-  );
-  return [row, back];
-}
-
-function singleChannelMenu(p: ChannelPurpose): Row[] {
-  const select = new ChannelSelectMenuBuilder()
-    .setCustomId(`cfg:channelSet:${p}`)
-    .setPlaceholder(`Select a channel for ${CHANNEL_LABELS[p]}`)
-    .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-    .setMinValues(1)
-    .setMaxValues(1);
-  const row1 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    select,
-  );
-  const row2 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`cfg:channelClear:${p}`)
-      .setLabel("Clear")
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId("cfg:channels")
-      .setLabel("Back")
-      .setStyle(ButtonStyle.Secondary),
-  );
-  return [row1, row2];
-}
-
-function managersMenu(c: GuildConfig): Row[] {
-  const userSel = new UserSelectMenuBuilder()
-    .setCustomId("cfg:managersUsers")
-    .setPlaceholder("Set manager users (replaces the list)")
-    .setMinValues(0)
-    .setMaxValues(25);
-  if (c.managers.userIds.length > 0) {
-    userSel.setDefaultUsers(c.managers.userIds.slice(0, 25));
-  }
-  const roleSel = new RoleSelectMenuBuilder()
-    .setCustomId("cfg:managersRoles")
-    .setPlaceholder("Set manager roles (replaces the list)")
-    .setMinValues(0)
-    .setMaxValues(25);
-  if (c.managers.roleIds.length > 0) {
-    roleSel.setDefaultRoles(c.managers.roleIds.slice(0, 25));
-  }
-  const row1 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    userSel,
-  );
-  const row2 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    roleSel,
-  );
-  const row3 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("cfg:managersClear")
-      .setLabel("Clear all managers")
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId("cfg:back")
-      .setLabel("Back")
-      .setStyle(ButtonStyle.Secondary),
-  );
-  return [row1, row2, row3];
 }
 
 const command: SlashCommand = {
@@ -398,20 +386,11 @@ const command: SlashCommand = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.inGuild() || !interaction.guildId) {
-      await interaction.reply({
-        content: "Run this in a server.",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: "Run this in a server.", ephemeral: true });
       return;
     }
-    if (
-      !isAdminOrOwner(interaction) &&
-      !PERM_WHITELIST.has(interaction.user.id)
-    ) {
-      await interaction.reply({
-        content: "Only administrators can change the config.",
-        ephemeral: true,
-      });
+    if (!isAdminOrOwner(interaction) && !PERM_WHITELIST.has(interaction.user.id)) {
+      await interaction.reply({ content: "Only administrators can change the config.", ephemeral: true });
       return;
     }
 
@@ -420,7 +399,7 @@ const command: SlashCommand = {
 
     const reply = await interaction.reply({
       embeds: [buildOverviewEmbed(cfg)],
-      components: mainMenu(),
+      components: [mainDropdownRow(), closeRow()],
       ephemeral: true,
       fetchReply: true,
     });
@@ -437,164 +416,156 @@ const command: SlashCommand = {
 
         if (id === "cfg:close") {
           collector.stop("closed");
-          await i.update({
-            content: "Configuration closed.",
-            embeds: [],
-            components: [],
-          });
+          await i.update({ content: "Configuration closed.", embeds: [], components: [] });
           return;
         }
-        if (id === "cfg:back" || id === "cfg:refresh") {
+
+        if (id === "cfg:back") {
           cfg = await getGuildConfig(guildId);
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: mainMenu(),
-          });
+          await i.update({ embeds: [buildOverviewEmbed(cfg)], components: [mainDropdownRow(), closeRow()] });
           return;
         }
-        if (id === "cfg:modules") {
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: modulesMenu(cfg),
-          });
-          return;
-        }
-        if (id.startsWith("cfg:module:")) {
-          const m = id.slice("cfg:module:".length) as ModuleName;
-          if (MODULE_NAMES.includes(m)) {
-            cfg = await updateGuildConfig(guildId, (c) => {
-              c.modules[m] = !c.modules[m];
-              return c;
-            });
+
+        if (id === "cfg:module:select" && i.isStringSelectMenu()) {
+          const modId = i.values[0]!;
+          cfg = await getGuildConfig(guildId);
+
+          if (modId === "staff") {
+            const view = await staffRolesView(guildId);
+            await i.update({ embeds: [view.embed], components: view.rows });
+            return;
           }
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: modulesMenu(cfg),
-          });
-          return;
-        }
-        if (id === "cfg:channels") {
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: channelsMenu(),
-          });
-          return;
-        }
-        if (id.startsWith("cfg:channelPick:")) {
-          const p = id.slice("cfg:channelPick:".length) as ChannelPurpose;
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: singleChannelMenu(p),
-          });
-          return;
-        }
-        if (id.startsWith("cfg:channelSet:") && i.isChannelSelectMenu()) {
-          const p = id.slice("cfg:channelSet:".length) as ChannelPurpose;
-          const ch = i.values[0];
-          if (CHANNEL_PURPOSES.includes(p) && ch) {
-            cfg = await updateGuildConfig(guildId, (c) => {
-              c.channels[p] = ch;
-              return c;
-            });
+
+          if (modId === "quota") {
+            await i.update({ embeds: [buildQuotaEmbed(cfg)], components: quotaRows(cfg) });
+            return;
           }
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: singleChannelMenu(p),
-          });
+
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod) return;
+          await i.update({ embeds: [buildModuleEmbed(cfg, mod)], components: moduleActionRows(cfg, mod) });
           return;
         }
-        if (id.startsWith("cfg:channelClear:")) {
-          const p = id.slice("cfg:channelClear:".length) as ChannelPurpose;
-          if (CHANNEL_PURPOSES.includes(p)) {
-            cfg = await updateGuildConfig(guildId, (c) => {
-              delete c.channels[p];
-              return c;
-            });
+
+        if (id.startsWith("cfg:mod:view:")) {
+          const modId = id.slice("cfg:mod:view:".length);
+          cfg = await getGuildConfig(guildId);
+
+          if (modId === "staff") {
+            const view = await staffRolesView(guildId);
+            await i.update({ embeds: [view.embed], components: view.rows });
+            return;
           }
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: singleChannelMenu(p),
-          });
+          if (modId === "quota") {
+            await i.update({ embeds: [buildQuotaEmbed(cfg)], components: quotaRows(cfg) });
+            return;
+          }
+
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod) return;
+          await i.update({ embeds: [buildModuleEmbed(cfg, mod)], components: moduleActionRows(cfg, mod) });
           return;
         }
-        if (id === "cfg:managers") {
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: managersMenu(cfg),
-          });
-          return;
-        }
-        if (id === "cfg:managersUsers" && i.isUserSelectMenu()) {
-          const ids = Array.from(i.values);
+
+        if (id.startsWith("cfg:mod:toggle:")) {
+          const modId = id.slice("cfg:mod:toggle:".length);
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod) return;
           cfg = await updateGuildConfig(guildId, (c) => {
-            c.managers.userIds = ids;
+            c.modules[mod.moduleKey] = !c.modules[mod.moduleKey];
             return c;
           });
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: managersMenu(cfg),
-          });
+          await i.update({ embeds: [buildModuleEmbed(cfg, mod)], components: moduleActionRows(cfg, mod) });
           return;
         }
-        if (id === "cfg:managersRoles" && i.isRoleSelectMenu()) {
-          const ids = Array.from(i.values);
-          cfg = await updateGuildConfig(guildId, (c) => {
-            c.managers.roleIds = ids;
-            return c;
-          });
+
+        if (id.startsWith("cfg:mod:setchannel:")) {
+          const modId = id.slice("cfg:mod:setchannel:".length);
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod || !mod.channelKey) return;
           await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: managersMenu(cfg),
-          });
-          return;
-        }
-        if (id === "cfg:managersClear") {
-          cfg = await updateGuildConfig(guildId, (c) => {
-            c.managers.userIds = [];
-            c.managers.roleIds = [];
-            return c;
-          });
-          await i.update({
-            embeds: [buildOverviewEmbed(cfg)],
-            components: managersMenu(cfg),
+            embeds: [buildModuleEmbed(cfg, mod).setDescription("Select a channel below:")],
+            components: channelPickRows(mod),
           });
           return;
         }
 
-        // -------- Quota panel --------
-        if (id === "cfg:quota") {
+        if (id.startsWith("cfg:mod:channelset:") && i.isChannelSelectMenu()) {
+          const modId = id.slice("cfg:mod:channelset:".length);
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod || !mod.channelKey) return;
+          const channelId = i.values[0]!;
+          const key = mod.channelKey;
+          cfg = await updateGuildConfig(guildId, (c) => {
+            c.channels[key] = channelId;
+            return c;
+          });
+          await i.update({ embeds: [buildModuleEmbed(cfg, mod)], components: moduleActionRows(cfg, mod) });
+          return;
+        }
+
+        if (id.startsWith("cfg:mod:channelclear:")) {
+          const modId = id.slice("cfg:mod:channelclear:".length);
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod || !mod.channelKey) return;
+          const key = mod.channelKey;
+          cfg = await updateGuildConfig(guildId, (c) => {
+            delete c.channels[key];
+            return c;
+          });
+          await i.update({ embeds: [buildModuleEmbed(cfg, mod)], components: moduleActionRows(cfg, mod) });
+          return;
+        }
+
+        if (id.startsWith("cfg:mod:setroles:")) {
+          const modId = id.slice("cfg:mod:setroles:".length);
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod) return;
           await i.update({
-            embeds: [buildQuotaEmbed(cfg)],
-            components: quotaMenu(cfg),
+            embeds: [buildModuleEmbed(cfg, mod).setDescription("Select permitted roles below:")],
+            components: rolePickRows(mod),
           });
           return;
         }
+
+        if (id.startsWith("cfg:mod:roleset:") && i.isRoleSelectMenu()) {
+          const modId = id.slice("cfg:mod:roleset:".length);
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod) return;
+          const roleIds = Array.from(i.values);
+          cfg = await updateGuildConfig(guildId, (c) => {
+            if (!c.moduleRoles) c.moduleRoles = {};
+            c.moduleRoles[modId] = roleIds;
+            return c;
+          });
+          await i.update({ embeds: [buildModuleEmbed(cfg, mod)], components: moduleActionRows(cfg, mod) });
+          return;
+        }
+
+        if (id.startsWith("cfg:mod:roleclear:")) {
+          const modId = id.slice("cfg:mod:roleclear:".length);
+          const mod = MODULE_DEFS.find((m) => m.id === modId);
+          if (!mod) return;
+          cfg = await updateGuildConfig(guildId, (c) => {
+            if (!c.moduleRoles) c.moduleRoles = {};
+            c.moduleRoles[modId] = [];
+            return c;
+          });
+          await i.update({ embeds: [buildModuleEmbed(cfg, mod)], components: moduleActionRows(cfg, mod) });
+          return;
+        }
+
         if (id === "cfg:quotaSet") {
           await i.showModal(quotaModal(cfg));
           try {
             const submit = await i.awaitModalSubmit({
-              filter: (s) =>
-                s.customId === "cfg:quotaModal" && s.user.id === i.user.id,
+              filter: (s) => s.customId === "cfg:quotaModal" && s.user.id === i.user.id,
               time: 5 * 60 * 1000,
             });
-            const messages = parseInt(
-              submit.fields.getTextInputValue("messages"),
-              10,
-            );
-            const modActions = parseInt(
-              submit.fields.getTextInputValue("modActions"),
-              10,
-            );
-            if (
-              !Number.isFinite(messages) ||
-              messages < 0 ||
-              !Number.isFinite(modActions) ||
-              modActions < 0
-            ) {
-              await submit.reply({
-                content: "Both values must be non-negative integers.",
-                ephemeral: true,
-              });
+            const messages = parseInt(submit.fields.getTextInputValue("messages"), 10);
+            const modActions = parseInt(submit.fields.getTextInputValue("modActions"), 10);
+            if (!Number.isFinite(messages) || messages < 0 || !Number.isFinite(modActions) || modActions < 0) {
+              await submit.reply({ content: "Both values must be non-negative integers.", ephemeral: true });
               return;
             }
             cfg = await updateGuildConfig(guildId, (c) => {
@@ -603,39 +574,30 @@ const command: SlashCommand = {
               return c;
             });
             if (submit.isFromMessage()) {
-              await submit.update({
-                embeds: [buildQuotaEmbed(cfg)],
-                components: quotaMenu(cfg),
-              });
+              await submit.update({ embeds: [buildQuotaEmbed(cfg)], components: quotaRows(cfg) });
             } else {
               await submit.reply({
-                content: `Quota updated: **${messages}** msgs / **${modActions}** mod actions per week.`,
+                content: `Quota set: **${messages}** messages / **${modActions}** mod actions per week.`,
                 ephemeral: true,
               });
             }
           } catch {
-            // Timed out or dismissed; leave the panel as-is.
+            // timed out or dismissed
           }
           return;
         }
+
         if (id === "cfg:quotaClear") {
-          cfg = await updateGuildConfig(guildId, (c) => {
-            delete c.quotaConfig;
-            return c;
-          });
-          await i.update({
-            embeds: [buildQuotaEmbed(cfg)],
-            components: quotaMenu(cfg),
-          });
+          cfg = await updateGuildConfig(guildId, (c) => { delete c.quotaConfig; return c; });
+          await i.update({ embeds: [buildQuotaEmbed(cfg)], components: quotaRows(cfg) });
           return;
         }
+
         if (id === "cfg:quotaDay") {
-          await i.update({
-            embeds: [buildQuotaEmbed(cfg)],
-            components: weekStartMenu(cfg),
-          });
+          await i.update({ embeds: [buildQuotaEmbed(cfg)], components: weekStartRows(cfg) });
           return;
         }
+
         if (id === "cfg:quotaDaySet" && i.isStringSelectMenu()) {
           const day = Number(i.values[0]);
           if (Number.isFinite(day) && day >= 0 && day <= 6) {
@@ -648,47 +610,28 @@ const command: SlashCommand = {
               return c;
             });
           }
-          await i.update({
-            embeds: [buildQuotaEmbed(cfg)],
-            components: quotaMenu(cfg),
-          });
+          await i.update({ embeds: [buildQuotaEmbed(cfg)], components: quotaRows(cfg) });
           return;
         }
 
-        // -------- Staff Roles panel --------
-        if (id === "cfg:staffRoles") {
-          const view = await staffRolesMenu(guildId);
-          await i.update({ embeds: [view.embed], components: view.rows });
-          return;
-        }
         if (id === "cfg:staffRoleAdd" && i.isRoleSelectMenu()) {
           const roleId = i.values[0];
-          if (roleId) {
-            await addStaffRole(guildId, roleId).catch(() => {});
-          }
-          const view = await staffRolesMenu(guildId);
+          if (roleId) await addStaffRole(guildId, roleId).catch(() => {});
+          const view = await staffRolesView(guildId);
           await i.update({ embeds: [view.embed], components: view.rows });
           return;
         }
+
         if (id === "cfg:staffRoleRemove" && i.isStringSelectMenu()) {
           const roleId = i.values[0];
-          if (roleId && roleId !== "_noop") {
-            await removeStaffRole(guildId, roleId).catch(() => {});
-          }
-          const view = await staffRolesMenu(guildId);
+          if (roleId && roleId !== "_noop") await removeStaffRole(guildId, roleId).catch(() => {});
+          const view = await staffRolesView(guildId);
           await i.update({ embeds: [view.embed], components: view.rows });
           return;
         }
       } catch {
         if (!i.replied && !i.deferred) {
-          try {
-            await i.reply({
-              content: "Something went wrong updating the config.",
-              ephemeral: true,
-            });
-          } catch {
-            // swallow
-          }
+          await i.reply({ content: "Something went wrong.", ephemeral: true }).catch(() => {});
         }
       }
     });
