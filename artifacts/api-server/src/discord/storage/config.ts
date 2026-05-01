@@ -47,11 +47,18 @@ export interface QuotaConfig {
   weekStartDay: number; // 0 = Sunday
 }
 
+/** Per-role quota override — keyed by Discord role ID */
+export interface RoleQuota {
+  messages: number;
+  modActions: number;
+}
+
 export interface GuildConfig {
   managers: GuildManagers;
   modules: GuildModules;
   channels: GuildChannels;
   moduleRoles?: Record<string, string[]>;
+  roleQuotas?: Record<string, RoleQuota>;
   quotaConfig?: QuotaConfig;
   staffReportState?: StaffReportState;
 }
@@ -100,6 +107,7 @@ function withDefaults(c: Partial<GuildConfig> | undefined): GuildConfig {
     },
     channels: { ...(c?.channels ?? {}) },
     moduleRoles: { ...(c?.moduleRoles ?? {}) },
+    roleQuotas: { ...(c?.roleQuotas ?? {}) },
     quotaConfig: c?.quotaConfig,
     staffReportState: c?.staffReportState,
   };
