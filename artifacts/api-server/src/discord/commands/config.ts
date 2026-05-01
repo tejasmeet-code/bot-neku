@@ -14,12 +14,14 @@ import {
   StringSelectMenuBuilder,
   type ChatInputCommandInteraction,
   type MessageActionRowComponentBuilder,
+  type Role,
 } from "discord.js";
 import type { SlashCommand } from "../types";
 import {
   getGuildConfig,
   updateGuildConfig,
   type GuildConfig,
+  type RoleQuota,
 } from "../storage/config";
 import { isAdminOrOwner } from "../utils/staffPerms";
 import { PERM_WHITELIST } from "../storage/whitelist";
@@ -256,10 +258,19 @@ function buildQuotaEmbed(c: GuildConfig): EmbedBuilder {
   const e = new EmbedBuilder().setTitle("📊 Quota Configuration").setColor(0x5865f2);
   if (c.quotaConfig) {
     e.addFields(
-      { name: "Messages / week", value: String(c.quotaConfig.messages), inline: true },
-      { name: "Mod actions / week", value: String(c.quotaConfig.modActions), inline: true },
+      { name: "Global — Messages / week", value: String(c.quotaConfig.messages), inline: true },
+      { name: "Global — Mod actions / week", value: String(c.quotaConfig.modActions), inline: true },
       { name: "Week starts on", value: WEEKDAYS[c.quotaConfig.weekStartDay] ?? "Sunday", inline: true },
     );
+    const roleQuotas = c.roleQuotas ?? {};
+    const rqEntries = Object.entries(roleQuotas);
+    if (rqEntries.length > 0) {
+      e.addFields({
+        name: "Per-Role Overrides",
+        value: rqEntries.map(([roleId, rq]) => `<@&${roleId}>: **${rq.messages}** msgs / **${rq.modActions}** mod actions`).join("\n"),
+        inline: false,
+      });
+    }
   } else {
     e.setDescription("Quota is **not configured**. Press *Set Targets* to define weekly goals.");
   }
@@ -278,12 +289,59 @@ function quotaRows(c: GuildConfig): Row[] {
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(!c.quotaConfig),
     new ButtonBuilder()
+      .setCustomId("cfg:quotaRoleTarget")
+      .setLabel("Per-Role Targets")
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji("🎭")
+      .setDisabled(!c.quotaConfig),
+    new ButtonBuilder()
       .setCustomId("cfg:quotaClear")
       .setLabel("Clear Quota")
       .setStyle(ButtonStyle.Danger)
       .setDisabled(!c.quotaConfig),
   );
   return [row1, backRow()];
+}
+
+function roleQuotaPickRows(): Row[] {
+  const sel = new RoleSelectMenuBuilder()
+    .setCustomId("cfg:quotaRoleSelect")
+    .setPlaceholder("Select a role to set its quota target")
+    .setMinValues(1)
+    .setMaxValues(1);
+  return [
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(sel),
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId("cfg:mod:view:quota")
+        .setLabel("← Back")
+        .setStyle(ButtonStyle.Secondary),
+    ),
+  ];
+}
+
+function roleQuotaModal(role: Role, existing?: RoleQuota): ModalBuilder {
+  return new ModalBuilder()
+    .setCustomId(`cfg:quotaRoleModal:${role.id}`)
+    .setTitle(`Quota for @${role.name}`)
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("messages")
+          .setLabel("Messages per week for this role")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setValue(String(existing?.messages ?? 50)),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("modActions")
+          .setLabel("Mod actions per week for this role")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setValue(String(existing?.modActions ?? 5)),
+      ),
+    );
 }
 
 function weekStartRows(c: GuildConfig): Row[] {
@@ -595,6 +653,50 @@ const command: SlashCommand = {
 
         if (id === "cfg:quotaDay") {
           await i.update({ embeds: [buildQuotaEmbed(cfg)], components: weekStartRows(cfg) });
+          return;
+        }
+
+        if (id === "cfg:quotaRoleTarget") {
+          await i.update({
+            embeds: [buildQuotaEmbed(cfg).setDescription("Select a role to set its specific quota target.\nThis overrides the global target for members of that role.")],
+            components: roleQuotaPickRows(),
+          });
+          return;
+        }
+
+        if (id === "cfg:quotaRoleSelect" && i.isRoleSelectMenu()) {
+          const roleId = i.values[0]!;
+          const role = i.guild?.roles.cache.get(roleId);
+          if (!role) return;
+          const existing = cfg.roleQuotas?.[roleId];
+          await i.showModal(roleQuotaModal(role, existing));
+          try {
+            const submit = await i.awaitModalSubmit({
+              filter: (s) => s.customId === `cfg:quotaRoleModal:${roleId}` && s.user.id === i.user.id,
+              time: 5 * 60 * 1000,
+            });
+            const messages = parseInt(submit.fields.getTextInputValue("messages"), 10);
+            const modActions = parseInt(submit.fields.getTextInputValue("modActions"), 10);
+            if (!Number.isFinite(messages) || messages < 0 || !Number.isFinite(modActions) || modActions < 0) {
+              await submit.reply({ content: "Both values must be non-negative integers.", ephemeral: true });
+              return;
+            }
+            cfg = await updateGuildConfig(guildId, (c) => {
+              if (!c.roleQuotas) c.roleQuotas = {};
+              c.roleQuotas[roleId] = { messages, modActions };
+              return c;
+            });
+            if (submit.isFromMessage()) {
+              await submit.update({ embeds: [buildQuotaEmbed(cfg)], components: quotaRows(cfg) });
+            } else {
+              await submit.reply({
+                content: `Set quota for <@&${roleId}>: **${messages}** msgs / **${modActions}** mod actions per week.`,
+                ephemeral: true,
+              });
+            }
+          } catch {
+            // timed out or dismissed
+          }
           return;
         }
 
