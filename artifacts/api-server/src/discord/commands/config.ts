@@ -262,15 +262,20 @@ function buildQuotaEmbed(c: GuildConfig): EmbedBuilder {
       { name: "Global — Mod actions / week", value: String(c.quotaConfig.modActions), inline: true },
       { name: "Week starts on", value: WEEKDAYS[c.quotaConfig.weekStartDay] ?? "Sunday", inline: true },
     );
-    const roleQuotas = c.roleQuotas ?? {};
-    const rqEntries = Object.entries(roleQuotas);
+    const rqEntries = Object.entries(c.roleQuotas ?? {});
     if (rqEntries.length > 0) {
       e.addFields({
-        name: "Per-Role Overrides",
+        name: "📌 Per-Role Overrides",
         value: rqEntries.map(([roleId, rq]) => `<@&${roleId}>: **${rq.messages}** msgs / **${rq.modActions}** mod actions`).join("\n"),
         inline: false,
       });
     }
+    const wl = c.quotaWhitelistRoles ?? [];
+    e.addFields({
+      name: "🚫 Quota Whitelist (exempt from check)",
+      value: wl.length > 0 ? wl.map((r) => `<@&${r}>`).join(", ") : "*None — all staff are checked*",
+      inline: false,
+    });
   } else {
     e.setDescription("Quota is **not configured**. Press *Set Targets* to define weekly goals.");
   }
@@ -300,7 +305,56 @@ function quotaRows(c: GuildConfig): Row[] {
       .setStyle(ButtonStyle.Danger)
       .setDisabled(!c.quotaConfig),
   );
-  return [row1, backRow()];
+  const row2 = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("cfg:quotaWhitelist")
+      .setLabel("Manage Whitelist")
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji("🚫")
+      .setDisabled(!c.quotaConfig),
+  );
+  return [row1, row2, backRow()];
+}
+
+function whitelistManageRows(c: GuildConfig, roleNameMap: Map<string, string>): Row[] {
+  const addSel = new RoleSelectMenuBuilder()
+    .setCustomId("cfg:quotaWhitelistAdd")
+    .setPlaceholder("Add roles to quota whitelist (exempt from Friday check)")
+    .setMinValues(1)
+    .setMaxValues(10);
+
+  const wl = c.quotaWhitelistRoles ?? [];
+  const rmSel = new StringSelectMenuBuilder()
+    .setCustomId("cfg:quotaWhitelistRemove")
+    .setPlaceholder("Remove a role from the whitelist")
+    .setMinValues(1)
+    .setMaxValues(1);
+
+  if (wl.length > 0) {
+    rmSel.addOptions(wl.slice(0, 25).map((r) => ({
+      label: roleNameMap.get(r) ?? `Role ${r}`,
+      value: r,
+      description: `ID: ${r}`,
+    })));
+  } else {
+    rmSel.addOptions({ label: "(whitelist is empty)", value: "_noop", default: true }).setDisabled(true);
+  }
+
+  return [
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(addSel),
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(rmSel),
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId("cfg:quotaWhitelistClearAll")
+        .setLabel("Clear All")
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(wl.length === 0),
+      new ButtonBuilder()
+        .setCustomId("cfg:mod:view:quota")
+        .setLabel("← Back")
+        .setStyle(ButtonStyle.Secondary),
+    ),
+  ];
 }
 
 function roleQuotaPickRows(): Row[] {
@@ -653,6 +707,103 @@ const command: SlashCommand = {
 
         if (id === "cfg:quotaDay") {
           await i.update({ embeds: [buildQuotaEmbed(cfg)], components: weekStartRows(cfg) });
+          return;
+        }
+
+        if (id === "cfg:quotaWhitelist") {
+          const roleNameMap = new Map(
+            (i.guild?.roles.cache.map((r) => [r.id, r.name]) ?? []),
+          );
+          await i.update({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle("🚫 Quota Whitelist")
+                .setColor(0x5865f2)
+                .setDescription(
+                  "Roles on this list are **completely skipped** during the Friday quota check — they won't receive warnings, strikes, or terminations.\n\n" +
+                  "Use the role picker to add roles, or the dropdown to remove them.",
+                )
+                .addFields({
+                  name: "Currently Whitelisted",
+                  value: (cfg.quotaWhitelistRoles ?? []).length > 0
+                    ? (cfg.quotaWhitelistRoles ?? []).map((r) => `<@&${r}>`).join(", ")
+                    : "*None*",
+                }),
+            ],
+            components: whitelistManageRows(cfg, roleNameMap),
+          });
+          return;
+        }
+
+        if (id === "cfg:quotaWhitelistAdd" && i.isRoleSelectMenu()) {
+          const toAdd = Array.from(i.values);
+          cfg = await updateGuildConfig(guildId, (c) => {
+            const current = new Set(c.quotaWhitelistRoles ?? []);
+            for (const r of toAdd) current.add(r);
+            c.quotaWhitelistRoles = [...current];
+            return c;
+          });
+          const roleNameMap = new Map(i.guild?.roles.cache.map((r) => [r.id, r.name]) ?? []);
+          await i.update({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle("🚫 Quota Whitelist")
+                .setColor(0x57f287)
+                .setDescription(`Added ${toAdd.map((r) => `<@&${r}>`).join(", ")} to the whitelist.`)
+                .addFields({
+                  name: "Currently Whitelisted",
+                  value: (cfg.quotaWhitelistRoles ?? []).length > 0
+                    ? (cfg.quotaWhitelistRoles ?? []).map((r) => `<@&${r}>`).join(", ")
+                    : "*None*",
+                }),
+            ],
+            components: whitelistManageRows(cfg, roleNameMap),
+          });
+          return;
+        }
+
+        if (id === "cfg:quotaWhitelistRemove" && i.isStringSelectMenu()) {
+          const toRemove = i.values[0]!;
+          if (toRemove !== "_noop") {
+            cfg = await updateGuildConfig(guildId, (c) => {
+              c.quotaWhitelistRoles = (c.quotaWhitelistRoles ?? []).filter((r) => r !== toRemove);
+              return c;
+            });
+          }
+          const roleNameMap = new Map(i.guild?.roles.cache.map((r) => [r.id, r.name]) ?? []);
+          await i.update({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle("🚫 Quota Whitelist")
+                .setColor(0x5865f2)
+                .setDescription("Role removed from the whitelist.")
+                .addFields({
+                  name: "Currently Whitelisted",
+                  value: (cfg.quotaWhitelistRoles ?? []).length > 0
+                    ? (cfg.quotaWhitelistRoles ?? []).map((r) => `<@&${r}>`).join(", ")
+                    : "*None*",
+                }),
+            ],
+            components: whitelistManageRows(cfg, roleNameMap),
+          });
+          return;
+        }
+
+        if (id === "cfg:quotaWhitelistClearAll") {
+          cfg = await updateGuildConfig(guildId, (c) => {
+            c.quotaWhitelistRoles = [];
+            return c;
+          });
+          const roleNameMap = new Map(i.guild?.roles.cache.map((r) => [r.id, r.name]) ?? []);
+          await i.update({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle("🚫 Quota Whitelist")
+                .setColor(0xed4245)
+                .setDescription("Whitelist cleared. All staff roles will now be checked on Fridays."),
+            ],
+            components: whitelistManageRows(cfg, roleNameMap),
+          });
           return;
         }
 
