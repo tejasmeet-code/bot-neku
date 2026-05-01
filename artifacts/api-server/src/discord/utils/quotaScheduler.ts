@@ -40,12 +40,20 @@ async function runQuotaCheck(client: Client): Promise<void> {
       const infChannelId = cfg.channels.infractions;
       const infChannel = infChannelId ? guild.channels.cache.get(infChannelId) : null;
 
+      const whitelistRoles = new Set(cfg.quotaWhitelistRoles ?? []);
+
       for (const [userId, userQuota] of Object.entries(allQuota)) {
         const member = await guild.members.fetch(userId).catch(() => null);
         if (!member) continue;
 
         const isStaff = staffRoles.length === 0 || member.roles.cache.some((r) => staffRoleIds.has(r.id));
         if (!isStaff) continue;
+
+        // Skip members whose any role is on the quota whitelist
+        if (whitelistRoles.size > 0 && member.roles.cache.some((r) => whitelistRoles.has(r.id))) {
+          logger.debug({ userId, guildId: guild.id }, "quotaScheduler: skipping whitelisted member");
+          continue;
+        }
 
         // --- Role-wise quota resolution ---
         // Find the staff member's highest-position staff role that has a role-specific quota.
