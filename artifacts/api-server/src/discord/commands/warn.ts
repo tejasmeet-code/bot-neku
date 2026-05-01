@@ -1,11 +1,12 @@
 import {
   SlashCommandBuilder,
+  ChannelType,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommand } from "../types";
 import { addWarning, clearWarnings, getWarnings } from "../storage/warnings";
 import { ensureWhitelisted } from "../utils/gate";
-import { COLORS, EMOJI, prettyEmbed, successEmbed, warnEmbed, infoEmbed, errorEmbed } from "../utils/embedStyle";
+import { COLORS, EMOJI, prettyEmbed, successEmbed, warnEmbed, infoEmbed } from "../utils/embedStyle";
 import { recordModStat } from "../storage/modstats";
 import { bumpModAction } from "../storage/quota";
 import { getGuildConfig } from "../storage/config";
@@ -53,6 +54,8 @@ const command: SlashCommand = {
       const reason = interaction.options.getString("reason", true);
       const proof = interaction.options.getString("proof");
 
+      await interaction.deferReply({ ephemeral: true });
+
       await addWarning({ guildId, userId: target.id, moderatorId: interaction.user.id, reason });
 
       const caseEntry = await createCase({
@@ -79,12 +82,33 @@ const command: SlashCommand = {
         proof,
       });
 
-      await interaction.reply({
+      // Post to infractions log channel
+      const infChannelId = cfg.channels.infractions;
+      if (infChannelId) {
+        const infChannel = interaction.guild.channels.cache.get(infChannelId);
+        if (infChannel && infChannel.type === ChannelType.GuildText) {
+          await (infChannel as any).send({
+            embeds: [prettyEmbed({
+              title: `⚠️ Warning Issued — Case #${caseEntry.case_number}`,
+              color: COLORS.warning,
+              fields: [
+                { name: "User", value: `<@${target.id}> (${target.tag})`, inline: true },
+                { name: "Moderator", value: `<@${interaction.user.id}>`, inline: true },
+                { name: "Total Warnings", value: String(total), inline: true },
+                { name: "Reason", value: reason, inline: false },
+                ...(proof ? [{ name: "Proof", value: proof, inline: false }] : []),
+              ],
+              footer: `Case #${caseEntry.case_number}`,
+            })],
+          }).catch(() => {});
+        }
+      }
+
+      await interaction.editReply({
         embeds: [warnEmbed(
           `${target.tag} warned — Case #${caseEntry.case_number}`,
           `**Reason:** ${reason}\nThey now have **${total}** warning${total === 1 ? "" : "s"}.`,
         )],
-        ephemeral: true,
       });
       return;
     }
