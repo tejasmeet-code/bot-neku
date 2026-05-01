@@ -1,0 +1,51 @@
+{
+  "1388654994307158156": {
+    "entries": [
+      {
+        "id": "molhqvew-eqtjw5",
+        "modId": "1181221352393420856",
+        "targetId": "1491073051293515848",
+        "action": "jail",
+        "delta": 1,
+        "reason": "test",
+        "at": 1777553983112
+      },
+      {
+        "id": "molhrh8d-3b4q8z",
+        "modId": "1181221352393420856",
+        "targetId": "1491073051293515848",
+        "action": "unjail",
+        "delta": -1,
+        "reason": "Released by moderator",
+        "at": 1777554011389
+      },
+      {
+        "id": "molkxysn-3uiiwf",
+        "modId": "1181221352393420856",
+        "targetId": "1499042568279818361",
+        "action": "jail",
+        "delta": 1,
+        "reason": "Test",
+        "at": 1777559352935
+      },
+      {
+        "id": "mollh55t-w8amjd",
+        "modId": "1499042568279818361",
+        "targetId": "1499042568279818361",
+        "action": "unjail",
+        "delta": -1,
+        "reason": "Released by moderator",
+        "at": 1777560247649
+      },
+      {
+        "id": "mollz2sk-tjxnm9",
+        "modId": "1181221352393420856",
+        "targetId": "1499042568279818361",
+        "action": "jail",
+        "delta": 1,
+        "reason": "No reason provided",
+        "at": 1777561084388
+      }
+    ]
+  }
+}

@@ -1,0 +1,421 @@
+{
+  "1305572982403498074": {
+    "roles": [
+      {
+        "roleId": "1313860773289787393",
+        "position": 1
+      },
+      {
+        "roleId": "1492766957601296404",
+        "position": 2
+      },
+      {
+        "roleId": "1492764550125191228",
+        "position": 3
+      },
+      {
+        "roleId": "1495059189985448027",
+        "position": 4
+      },
+      {
+        "roleId": "1492764291940749353",
+        "position": 5
+      },
+      {
+        "roleId": "1492764897514229790",
+        "position": 6
+      },
+      {
+        "roleId": "1495059247493550151",
+        "position": 7
+      },
+      {
+        "roleId": "1492763821553487942",
+        "position": 8
+      },
+      {
+        "roleId": "1492763371429433414",
+        "position": 9
+      },
+      {
+        "roleId": "1492763252453802064",
+        "position": 10
+      },
+      {
+        "roleId": "1492763205498568705",
+        "position": 11
+      }
+    ],
+    "profiles": {
+      "1181221352393420856": {
+        "userId": "1181221352393420856",
+        "firstJoinedAt": 1777472773039,
+        "currentRoleId": "1492764291940749353",
+        "positionHistory": [
+          {
+            "roleId": "1492764291940749353",
+            "fromAt": 1777472773039,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [
+          {
+            "id": "moljhjqy-2j7sf9",
+            "type": "warning",
+            "at": 1777556907322,
+            "byUserId": "1181221352393420856",
+            "reason": "Test"
+          }
+        ],
+        "terminated": false
+      },
+      "1467525937120678071": {
+        "userId": "1467525937120678071",
+        "firstJoinedAt": 1777473296982,
+        "currentRoleId": "1492763252453802064",
+        "positionHistory": [
+          {
+            "roleId": "1492763252453802064",
+            "fromAt": 1777473296983,
+            "toAt": 1777473370975
+          },
+          {
+            "roleId": "1492763371429433414",
+            "fromAt": 1777473370975,
+            "toAt": 1777473412610
+          },
+          {
+            "roleId": "1492763252453802064",
+            "fromAt": 1777473412610,
+            "toAt": 1777556685409
+          },
+          {
+            "roleId": "1492763205498568705",
+            "fromAt": 1777556685409,
+            "toAt": 1777556713350
+          },
+          {
+            "roleId": "1492763252453802064",
+            "fromAt": 1777556713553,
+            "toAt": null
+          }
+        ],
+        "promotions": [
+          {
+            "fromRoleId": "1492763252453802064",
+            "toRoleId": "1492763371429433414",
+            "at": 1777473296982,
+            "byUserId": "1181221352393420856",
+            "reason": "Test"
+          },
+          {
+            "fromRoleId": "1492763205498568705",
+            "toRoleId": "1492763252453802064",
+            "at": 1777556713565,
+            "byUserId": "1181221352393420856"
+          }
+        ],
+        "demotions": [
+          {
+            "fromRoleId": "1492763371429433414",
+            "toRoleId": "1492763252453802064",
+            "at": 1777473370965,
+            "byUserId": "1181221352393420856",
+            "reason": "test done"
+          },
+          {
+            "fromRoleId": "1492763252453802064",
+            "toRoleId": "1492763205498568705",
+            "at": 1777556686182,
+            "byUserId": "1181221352393420856",
+            "reason": "test"
+          }
+        ],
+        "infractions": [
+          {
+            "id": "mok5r2ov-9a4ey0",
+            "type": "demotion",
+            "at": 1777473370975,
+            "byUserId": "1181221352393420856",
+            "reason": "test done"
+          },
+          {
+            "id": "moljct47-34qejd",
+            "type": "demotion",
+            "at": 1777556686183,
+            "byUserId": "1181221352393420856",
+            "reason": "test"
+          }
+        ],
+        "terminated": false
+      },
+      "1304013684577665074": {
+        "userId": "1304013684577665074",
+        "firstJoinedAt": 1777473393333,
+        "currentRoleId": "1492766957601296404",
+        "positionHistory": [
+          {
+            "roleId": "1492766957601296404",
+            "fromAt": 1777473393333,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [
+          {
+            "id": "moljg3um-gtvbvw",
+            "type": "demotion",
+            "at": 1777556840062,
+            "byUserId": "1181221352393420856",
+            "reason": "test"
+          }
+        ],
+        "terminated": false
+      },
+      "1288468875192569856": {
+        "userId": "1288468875192569856",
+        "firstJoinedAt": 1777553872344,
+        "currentRoleId": "1492763205498568705",
+        "positionHistory": [
+          {
+            "roleId": "1492763205498568705",
+            "fromAt": 1777553872344,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "1134578744489672705": {
+        "userId": "1134578744489672705",
+        "firstJoinedAt": 1777553872345,
+        "currentRoleId": "1492763205498568705",
+        "positionHistory": [
+          {
+            "roleId": "1492763205498568705",
+            "fromAt": 1777553872345,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "1376741197686771798": {
+        "userId": "1376741197686771798",
+        "firstJoinedAt": 1777553872346,
+        "currentRoleId": "1313860773289787393",
+        "positionHistory": [
+          {
+            "roleId": "1313860773289787393",
+            "fromAt": 1777553872346,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "1176236917466071192": {
+        "userId": "1176236917466071192",
+        "firstJoinedAt": 1777553872346,
+        "currentRoleId": "1492763252453802064",
+        "positionHistory": [
+          {
+            "roleId": "1492763252453802064",
+            "fromAt": 1777553872346,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "1235945897146454046": {
+        "userId": "1235945897146454046",
+        "firstJoinedAt": 1777553872347,
+        "currentRoleId": "1492763205498568705",
+        "positionHistory": [
+          {
+            "roleId": "1492763205498568705",
+            "fromAt": 1777553872347,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "1432032688222765168": {
+        "userId": "1432032688222765168",
+        "firstJoinedAt": 1777553872347,
+        "currentRoleId": "1495059189985448027",
+        "positionHistory": [
+          {
+            "roleId": "1495059189985448027",
+            "fromAt": 1777553872347,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "1136206187130527794": {
+        "userId": "1136206187130527794",
+        "firstJoinedAt": 1777553872348,
+        "currentRoleId": "1492763252453802064",
+        "positionHistory": [
+          {
+            "roleId": "1492763252453802064",
+            "fromAt": 1777553872348,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "1384512046200127570": {
+        "userId": "1384512046200127570",
+        "firstJoinedAt": 1777553872348,
+        "currentRoleId": "1313860773289787393",
+        "positionHistory": [
+          {
+            "roleId": "1313860773289787393",
+            "fromAt": 1777553872348,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      }
+    }
+  },
+  "1388654994307158156": {
+    "roles": [
+      {
+        "roleId": "1399304963070361641",
+        "position": 1
+      },
+      {
+        "roleId": "1399305112702156811",
+        "position": 2
+      },
+      {
+        "roleId": "1490322752861769769",
+        "position": 3
+      },
+      {
+        "roleId": "1495777783417143356",
+        "position": 4
+      },
+      {
+        "roleId": "1489268841220407326",
+        "position": 5
+      },
+      {
+        "roleId": "1488899659924770816",
+        "position": 6
+      },
+      {
+        "roleId": "1495778212456693780",
+        "position": 7
+      },
+      {
+        "roleId": "1410607699292459008",
+        "position": 8
+      },
+      {
+        "roleId": "1410607793391796325",
+        "position": 9
+      },
+      {
+        "roleId": "1400463465969356853",
+        "position": 10
+      },
+      {
+        "roleId": "1489259845918920865",
+        "position": 11
+      }
+    ],
+    "profiles": {
+      "1467525937120678071": {
+        "userId": "1467525937120678071",
+        "firstJoinedAt": 1777473297597,
+        "currentRoleId": "1400463465969356853",
+        "positionHistory": [
+          {
+            "roleId": "1400463465969356853",
+            "fromAt": 1777473297597,
+            "toAt": 1777473370964
+          },
+          {
+            "roleId": "1410607793391796325",
+            "fromAt": 1777473370964,
+            "toAt": 1777556685879
+          },
+          {
+            "roleId": "1489259845918920865",
+            "fromAt": 1777556685879,
+            "toAt": 1777556713814
+          },
+          {
+            "roleId": "1400463465969356853",
+            "fromAt": 1777556714250,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "1181221352393420856": {
+        "userId": "1181221352393420856",
+        "firstJoinedAt": 1777559606948,
+        "currentRoleId": "1489268841220407326",
+        "positionHistory": [
+          {
+            "roleId": "1489268841220407326",
+            "fromAt": 1777559606948,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      },
+      "867277178684178453": {
+        "userId": "867277178684178453",
+        "firstJoinedAt": 1777559829293,
+        "currentRoleId": "1490322752861769769",
+        "positionHistory": [
+          {
+            "roleId": "1490322752861769769",
+            "fromAt": 1777559829293,
+            "toAt": null
+          }
+        ],
+        "promotions": [],
+        "demotions": [],
+        "infractions": [],
+        "terminated": false
+      }
+    }
+  }
+}

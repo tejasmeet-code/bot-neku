@@ -1,0 +1,39 @@
+{
+  "1388654994307158156": {
+    "1181221352393420856": {
+      "weekly": [
+        {
+          "weekStart": 1777161600000,
+          "messages": 0,
+          "modActions": 3,
+          "fulfilled": false,
+          "action": "none"
+        }
+      ]
+    }
+  },
+  "1305572982403498074": {
+    "1181221352393420856": {
+      "weekly": [
+        {
+          "weekStart": 1777161600000,
+          "messages": 4,
+          "modActions": 0,
+          "fulfilled": false,
+          "action": "none"
+        }
+      ]
+    },
+    "1432032688222765168": {
+      "weekly": [
+        {
+          "weekStart": 1777161600000,
+          "messages": 3,
+          "modActions": 0,
+          "fulfilled": false,
+          "action": "none"
+        }
+      ]
+    }
+  }
+}
