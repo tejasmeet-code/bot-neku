@@ -60,22 +60,10 @@ const command: SlashCommand = {
       }
     }
 
+    await interaction.deferReply({ ephemeral: true });
+
     try {
-      // DM before ban so the message can be delivered
-      await sendPunishmentDM(target, {
-        action: "ban",
-        serverName: interaction.guild.name,
-        reason,
-        caseNumber: 0, // placeholder before case is created
-        guildId: interaction.guildId,
-        proof,
-      });
-
-      await interaction.guild.members.ban(target.id, {
-        reason: `${reason} — by ${interaction.user.tag}`,
-        deleteMessageSeconds: deleteDays * 86400,
-      });
-
+      // Create case FIRST so we have the real case number for the DM
       const caseEntry = await createCase({
         guildId: interaction.guildId,
         action: "ban",
@@ -85,16 +73,34 @@ const command: SlashCommand = {
         proof,
       });
 
+      // DM before ban so message is delivered while user is reachable
+      await sendPunishmentDM(target, {
+        action: "ban",
+        serverName: interaction.guild.name,
+        reason,
+        caseNumber: caseEntry.case_number,
+        guildId: interaction.guildId,
+        proof,
+      });
+
+      await interaction.guild.members.ban(target.id, {
+        reason: `[Case #${caseEntry.case_number}] ${reason} — by ${interaction.user.tag}`,
+        deleteMessageSeconds: deleteDays * 86400,
+      });
+
       await recordModStat({ guildId: interaction.guild.id, modId: interaction.user.id, targetId: target.id, action: "ban", delta: 1, reason });
       const cfg = await getGuildConfig(interaction.guild.id);
       await bumpModAction(interaction.guild.id, interaction.user.id, cfg.quotaConfig?.weekStartDay ?? 0);
 
-      await interaction.reply({
+      await interaction.editReply({
         embeds: [successEmbed(`Banned — Case #${caseEntry.case_number}`, `**${target.tag}** has been banned.\n**Reason:** ${reason}`)],
-        ephemeral: true,
       });
     } catch {
-      await interaction.reply({ embeds: [errorEmbed("Ban failed", "Could not ban that user.")], ephemeral: true });
+      if (interaction.deferred) {
+        await interaction.editReply({ embeds: [errorEmbed("Ban failed", "Could not ban that user.")] });
+      } else {
+        await interaction.reply({ embeds: [errorEmbed("Ban failed", "Could not ban that user.")], ephemeral: true });
+      }
     }
   },
 };
