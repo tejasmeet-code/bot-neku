@@ -10,6 +10,9 @@ export interface GuildModules {
   staffMgmt: boolean;
   quota: boolean;
   auditLog: boolean;
+  moderation: boolean;
+  infractions: boolean;
+  appeals: boolean;
 }
 
 export interface GuildChannels {
@@ -17,6 +20,9 @@ export interface GuildChannels {
   demotions?: string;
   botNotifications?: string;
   performance?: string;
+  moderation?: string;
+  infractions?: string;
+  appeals?: string;
   /**
    * Channel where the auto-updating staff tier report is pinned. Set via
    * `/staff-update-report channel:#x`.
@@ -45,14 +51,16 @@ export interface GuildConfig {
   managers: GuildManagers;
   modules: GuildModules;
   channels: GuildChannels;
+  moduleRoles?: Record<string, string[]>;
   quotaConfig?: QuotaConfig;
   staffReportState?: StaffReportState;
 }
 
 const DEFAULTS: GuildConfig = {
   managers: { roleIds: [], userIds: [] },
-  modules: { staffMgmt: true, quota: true, auditLog: true },
+  modules: { staffMgmt: true, quota: true, auditLog: true, moderation: true, infractions: true, appeals: true },
   channels: {},
+  moduleRoles: {},
 };
 
 const FILE_PATH = dataFile("config.json");
@@ -86,8 +94,12 @@ function withDefaults(c: Partial<GuildConfig> | undefined): GuildConfig {
       staffMgmt: c?.modules?.staffMgmt ?? true,
       quota: c?.modules?.quota ?? true,
       auditLog: c?.modules?.auditLog ?? true,
+      moderation: c?.modules?.moderation ?? true,
+      infractions: c?.modules?.infractions ?? true,
+      appeals: c?.modules?.appeals ?? true,
     },
     channels: { ...(c?.channels ?? {}) },
+    moduleRoles: { ...(c?.moduleRoles ?? {}) },
     quotaConfig: c?.quotaConfig,
     staffReportState: c?.staffReportState,
   };
