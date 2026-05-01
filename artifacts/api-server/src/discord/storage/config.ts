@@ -59,6 +59,7 @@ export interface GuildConfig {
   channels: GuildChannels;
   moduleRoles?: Record<string, string[]>;
   roleQuotas?: Record<string, RoleQuota>;
+  quotaWhitelistRoles?: string[];
   quotaConfig?: QuotaConfig;
   staffReportState?: StaffReportState;
 }
@@ -108,6 +109,7 @@ function withDefaults(c: Partial<GuildConfig> | undefined): GuildConfig {
     channels: { ...(c?.channels ?? {}) },
     moduleRoles: { ...(c?.moduleRoles ?? {}) },
     roleQuotas: { ...(c?.roleQuotas ?? {}) },
+    quotaWhitelistRoles: [...(c?.quotaWhitelistRoles ?? [])],
     quotaConfig: c?.quotaConfig,
     staffReportState: c?.staffReportState,
   };
