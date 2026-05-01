@@ -37,6 +37,8 @@ import staffHistory from "./commands/staff-history";
 import staffReport from "./commands/staff-report";
 import staffUpdateReport from "./commands/staff-update-report";
 import staffProfile from "./commands/staff-profile";
+import editCase from "./commands/edit-case";
+import banRequest from "./commands/ban-request";
 import { buildWhitelistCommand } from "./commands/whitelistFactory";
 import { WHITELISTED_COMMANDS } from "./storage/whitelist";
 
@@ -84,6 +86,8 @@ const commands: SlashCommand[] = [
   staffReport,
   staffUpdateReport,
   staffProfile,
+  editCase,
+  banRequest,
   ...whitelistCommands,
 ];
 
