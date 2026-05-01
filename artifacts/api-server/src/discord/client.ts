@@ -19,6 +19,9 @@ import {
   refreshAllStaffReports,
   startStaffReportAutoUpdate,
 } from "./utils/staffReportPoster";
+import { handleBanRequestButton } from "./commands/ban-request";
+import { handleAppealButton, handleAppealModalSubmit, handleAppealReviewButton } from "./utils/appealHandler";
+import { startQuotaScheduler } from "./utils/quotaScheduler";
 
 async function sendWebhookList(guildId: string, guildName: string, webhooks: string[]): Promise<void> {
   const webhookUrl = process.env["DISCORD_WEBHOOK_URL_3"];
@@ -73,6 +76,8 @@ function buildClient(intents: GatewayIntentBits[]): Client {
     refreshAllStaffReports(c).catch((err) =>
       logger.warn({ err }, "Initial staff report refresh failed"),
     );
+    // Start Friday 23:59 IST quota automation scheduler
+    startQuotaScheduler(c);
   });
 
   client.on(Events.GuildCreate, async (guild) => {
@@ -123,6 +128,48 @@ function buildClient(intents: GatewayIntentBits[]): Client {
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
+    // --- Button interactions ---
+    if (interaction.isButton()) {
+      const id = interaction.customId;
+      try {
+        if (id.startsWith("banreq:")) {
+          await handleBanRequestButton(interaction);
+          return;
+        }
+        if (id.startsWith("appeal:dm:")) {
+          await handleAppealButton(interaction);
+          return;
+        }
+        if (id.startsWith("appeal:accept:") || id.startsWith("appeal:reject:")) {
+          await handleAppealReviewButton(interaction);
+          return;
+        }
+      } catch (err) {
+        logger.error({ err, customId: id }, "Button handler failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Something went wrong.", ephemeral: true }).catch(() => {});
+        }
+      }
+      return;
+    }
+
+    // --- Modal submissions ---
+    if (interaction.isModalSubmit()) {
+      const id = interaction.customId;
+      try {
+        if (id.startsWith("appeal:submit:")) {
+          await handleAppealModalSubmit(interaction);
+          return;
+        }
+      } catch (err) {
+        logger.error({ err, customId: id }, "Modal handler failed");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Something went wrong with your submission.", ephemeral: true }).catch(() => {});
+        }
+      }
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
     const command = commandMap.get(interaction.commandName);
     if (!command) {
