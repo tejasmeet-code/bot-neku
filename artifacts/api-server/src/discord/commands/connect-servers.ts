@@ -238,7 +238,7 @@ const command: SlashCommand = {
             return;
           }
           await btn.update({
-            content: `✅ Connected. **Staff** server: \`${conn.staffGuildId}\` ↔ **Main** server: \`${conn.mainGuildId}\`.`,
+            content: `✅ Connected. \`${conn.guildAId}\` (${conn.guildARole}) ↔ \`${conn.guildBId}\` (${conn.guildBRole}).`,
             embeds: [],
             components: [],
           });
@@ -283,7 +283,8 @@ const command: SlashCommand = {
     }
 
     if (sub === "disconnect") {
-      const ok = await disconnectGuild(interaction.guildId);
+      const link = await getConnectedGuildId(interaction.guildId);
+      const ok = link ? await disconnectGuild(interaction.guildId, link.otherGuildId) : false;
       if (!ok) {
         await interaction.reply({
           content: "No active connection.",

@@ -1,17 +1,13 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import type { GuildMember } from "discord.js";
+import { dataFile } from "../../lib/paths";
+import { loadPersistentJson, persistPersistentJson } from "./persistentJson";
 
 export interface StaffRoleEntry {
   roleId: string;
-  position: number; // 1 = highest
+  position: number;
 }
 
-export type InfractionType =
-  | "warning"
-  | "strike"
-  | "demotion"
-  | "termination";
+export type InfractionType = "warning" | "strike" | "demotion" | "termination";
 
 export interface InfractionEntry {
   id: string;
@@ -20,6 +16,7 @@ export interface InfractionEntry {
   byUserId: string;
   reason: string;
   expiresAt?: number;
+  expiryDmSent?: boolean;
 }
 
 export interface PromotionEntry {
@@ -32,7 +29,7 @@ export interface PromotionEntry {
 
 export interface DemotionEntry {
   fromRoleId: string;
-  toRoleId: string | null; // null = terminated
+  toRoleId: string | null;
   at: number;
   byUserId: string;
   reason?: string;
@@ -48,6 +45,7 @@ export interface StaffProfile {
   infractions: InfractionEntry[];
   terminated: boolean;
   terminatedAt?: number;
+  partnershipScore: number;
 }
 
 export interface GuildStaff {
@@ -55,32 +53,21 @@ export interface GuildStaff {
   profiles: Record<string, StaffProfile>;
 }
 
-const DATA_DIR = path.resolve(process.cwd(), ".data");
-const FILE_PATH = path.join(DATA_DIR, "staff.json");
-
+const FILE_PATH = dataFile("staff.json");
 let cache: Record<string, GuildStaff> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 
 async function load(): Promise<Record<string, GuildStaff>> {
   if (cache) return cache;
-  try {
-    const raw = await fs.readFile(FILE_PATH, "utf8");
-    cache = JSON.parse(raw) as Record<string, GuildStaff>;
-  } catch {
-    cache = {};
-  }
+  cache = await loadPersistentJson("staff.json", FILE_PATH, {});
   return cache;
 }
 
 async function persist(data: Record<string, GuildStaff>): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(FILE_PATH, JSON.stringify(data, null, 2), "utf8");
+  await persistPersistentJson("staff.json", FILE_PATH, data);
 }
 
-function ensureGuild(
-  data: Record<string, GuildStaff>,
-  guildId: string,
-): GuildStaff {
+function ensureGuild(data: Record<string, GuildStaff>, guildId: string): GuildStaff {
   if (!data[guildId]) data[guildId] = { roles: [], profiles: {} };
   return data[guildId];
 }
@@ -90,77 +77,67 @@ function queueWrite(data: Record<string, GuildStaff>): Promise<void> {
   return writeQueue;
 }
 
-// ---------------- Roles ----------------
+function getHeldRoleEntry(roles: StaffRoleEntry[], member: GuildMember): StaffRoleEntry | null {
+  const memberRoleIds = new Set(member.roles.cache.keys());
+  let highest: StaffRoleEntry | null = null;
+  for (const r of roles) {
+    if (!memberRoleIds.has(r.roleId)) continue;
+    if (!highest || r.position < highest.position) {
+      highest = r;
+    }
+  }
+  return highest;
+}
 
-export async function listStaffRoles(
-  guildId: string,
-): Promise<StaffRoleEntry[]> {
+export async function listStaffRoles(guildId: string): Promise<StaffRoleEntry[]> {
   const data = await load();
   const g = data[guildId];
   if (!g) return [];
   return [...g.roles].sort((a, b) => a.position - b.position);
 }
 
-export async function getRoleEntry(
-  guildId: string,
-  roleId: string,
-): Promise<StaffRoleEntry | null> {
+export async function getRoleEntry(guildId: string, roleId: string): Promise<StaffRoleEntry | null> {
   const roles = await listStaffRoles(guildId);
   return roles.find((r) => r.roleId === roleId) ?? null;
 }
 
-export async function addStaffRole(
-  guildId: string,
-  roleId: string,
-  position?: number,
-): Promise<{ added: boolean; entry: StaffRoleEntry }> {
+export async function getHighestHeldStaffRole(guildId: string, member: GuildMember): Promise<StaffRoleEntry | null> {
+  const roles = await listStaffRoles(guildId);
+  return getHeldRoleEntry(roles, member);
+}
+
+export async function addStaffRole(guildId: string, roleId: string, position?: number): Promise<{ added: boolean; entry: StaffRoleEntry }> {
   const data = await load();
   const g = ensureGuild(data, guildId);
   const existing = g.roles.find((r) => r.roleId === roleId);
   if (existing) return { added: false, entry: existing };
-
   let pos: number;
   if (typeof position === "number" && position > 0) {
-    // Shift any role at this or lower position down by 1.
     pos = Math.floor(position);
-    for (const r of g.roles) {
-      if (r.position >= pos) r.position += 1;
-    }
+    for (const r of g.roles) if (r.position >= pos) r.position += 1;
   } else {
-    // Default = lowest + 1.
     const max = g.roles.reduce((m, r) => Math.max(m, r.position), 0);
     pos = max + 1;
   }
-
   const entry: StaffRoleEntry = { roleId, position: pos };
   g.roles.push(entry);
   await queueWrite(data);
   return { added: true, entry };
 }
 
-export async function removeStaffRole(
-  guildId: string,
-  roleId: string,
-): Promise<boolean> {
+export async function removeStaffRole(guildId: string, roleId: string): Promise<boolean> {
   const data = await load();
   const g = data[guildId];
   if (!g) return false;
   const idx = g.roles.findIndex((r) => r.roleId === roleId);
   if (idx === -1) return false;
   const removed = g.roles.splice(idx, 1)[0]!;
-  // Compact positions of anything that was below.
-  for (const r of g.roles) {
-    if (r.position > removed.position) r.position -= 1;
-  }
+  for (const r of g.roles) if (r.position > removed.position) r.position -= 1;
   await queueWrite(data);
   return true;
 }
 
-export async function reorderStaffRole(
-  guildId: string,
-  roleId: string,
-  newPosition: number,
-): Promise<boolean> {
+export async function reorderStaffRole(guildId: string, roleId: string, newPosition: number): Promise<boolean> {
   const data = await load();
   const g = data[guildId];
   if (!g) return false;
@@ -170,30 +147,20 @@ export async function reorderStaffRole(
   if (newPosition === oldPos) return true;
   for (const other of g.roles) {
     if (other.roleId === roleId) continue;
-    if (newPosition < oldPos && other.position >= newPosition && other.position < oldPos) {
-      other.position += 1;
-    } else if (newPosition > oldPos && other.position <= newPosition && other.position > oldPos) {
-      other.position -= 1;
-    }
+    if (newPosition < oldPos && other.position >= newPosition && other.position < oldPos) other.position += 1;
+    else if (newPosition > oldPos && other.position <= newPosition && other.position > oldPos) other.position -= 1;
   }
   r.position = newPosition;
   await queueWrite(data);
   return true;
 }
 
-// ---------------- Profiles ----------------
-
-export async function getProfile(
-  guildId: string,
-  userId: string,
-): Promise<StaffProfile | null> {
+export async function getProfile(guildId: string, userId: string): Promise<StaffProfile | null> {
   const data = await load();
   return data[guildId]?.profiles[userId] ?? null;
 }
 
-export async function listProfiles(
-  guildId: string,
-): Promise<StaffProfile[]> {
+export async function listProfiles(guildId: string): Promise<StaffProfile[]> {
   const data = await load();
   const g = data[guildId];
   if (!g) return [];
@@ -201,65 +168,32 @@ export async function listProfiles(
 }
 
 function newProfile(userId: string, now: number): StaffProfile {
-  return {
-    userId,
-    firstJoinedAt: now,
-    currentRoleId: null,
-    positionHistory: [],
-    promotions: [],
-    demotions: [],
-    infractions: [],
-    terminated: false,
-  };
+  return { userId, firstJoinedAt: now, currentRoleId: null, positionHistory: [], promotions: [], demotions: [], infractions: [], terminated: false, partnershipScore: 0 };
 }
 
-/**
- * Reconcile a member's stored profile to match the staff role they currently
- * hold in Discord. Creates the profile on first detection. Idempotent.
- */
-export async function syncProfileFromMember(
-  guildId: string,
-  member: GuildMember,
-): Promise<{ created: boolean; changed: boolean; profile: StaffProfile | null }> {
+export async function syncProfileFromMember(guildId: string, member: GuildMember): Promise<{ created: boolean; changed: boolean; profile: StaffProfile | null }> {
   const data = await load();
   const g = ensureGuild(data, guildId);
   const roles = [...g.roles].sort((a, b) => a.position - b.position);
   if (member.user.bot) return { created: false, changed: false, profile: null };
-
-  // Find the highest staff role (lowest position number) the member currently has.
-  const memberRoleIds = new Set(member.roles.cache.keys());
-  const held = roles.find((r) => memberRoleIds.has(r.roleId)) ?? null;
+  const held = getHeldRoleEntry(roles, member);
   const now = Date.now();
   const existing = g.profiles[member.id];
-
   if (!existing) {
     if (!held) return { created: false, changed: false, profile: null };
     const profile = newProfile(member.id, now);
     profile.currentRoleId = held.roleId;
-    profile.positionHistory.push({
-      roleId: held.roleId,
-      fromAt: now,
-      toAt: null,
-    });
+    profile.positionHistory.push({ roleId: held.roleId, fromAt: now, toAt: null });
     g.profiles[member.id] = profile;
     await queueWrite(data);
     return { created: true, changed: true, profile };
   }
-
-  if (existing.currentRoleId === (held?.roleId ?? null)) {
-    return { created: false, changed: false, profile: existing };
-  }
-
-  // Close out the previous open history entry, if any.
+  if (existing.currentRoleId === (held?.roleId ?? null)) return { created: false, changed: false, profile: existing };
   const open = existing.positionHistory.find((e) => e.toAt === null);
   if (open) open.toAt = now;
   existing.currentRoleId = held?.roleId ?? null;
   if (held) {
-    existing.positionHistory.push({
-      roleId: held.roleId,
-      fromAt: now,
-      toAt: null,
-    });
+    existing.positionHistory.push({ roleId: held.roleId, fromAt: now, toAt: null });
     if (existing.terminated) {
       existing.terminated = false;
       delete existing.terminatedAt;
@@ -269,14 +203,7 @@ export async function syncProfileFromMember(
   return { created: false, changed: true, profile: existing };
 }
 
-export async function recordPromotion(
-  guildId: string,
-  userId: string,
-  fromRoleId: string | null,
-  toRoleId: string,
-  byUserId: string,
-  reason?: string,
-): Promise<StaffProfile> {
+export async function recordPromotion(guildId: string, userId: string, fromRoleId: string | null, toRoleId: string, byUserId: string, reason?: string): Promise<StaffProfile> {
   const data = await load();
   const g = ensureGuild(data, guildId);
   let profile = g.profiles[userId];
@@ -290,14 +217,7 @@ export async function recordPromotion(
   return profile;
 }
 
-export async function recordDemotion(
-  guildId: string,
-  userId: string,
-  fromRoleId: string,
-  toRoleId: string | null,
-  byUserId: string,
-  reason?: string,
-): Promise<StaffProfile> {
+export async function recordDemotion(guildId: string, userId: string, fromRoleId: string, toRoleId: string | null, byUserId: string, reason?: string): Promise<StaffProfile> {
   const data = await load();
   const g = ensureGuild(data, guildId);
   let profile = g.profiles[userId];
@@ -311,18 +231,22 @@ export async function recordDemotion(
     profile.terminated = true;
     profile.terminatedAt = now;
     profile.currentRoleId = null;
+    delete g.profiles[userId];
   }
   await queueWrite(data);
   return profile;
 }
 
-export async function recordInfraction(
-  guildId: string,
-  userId: string,
-  type: InfractionType,
-  byUserId: string,
-  reason: string,
-): Promise<InfractionEntry> {
+export async function deleteProfile(guildId: string, userId: string): Promise<boolean> {
+  const data = await load();
+  const g = data[guildId];
+  if (!g || !g.profiles[userId]) return false;
+  delete g.profiles[userId];
+  await queueWrite(data);
+  return true;
+}
+
+export async function recordInfraction(guildId: string, userId: string, type: InfractionType, byUserId: string, reason: string): Promise<InfractionEntry> {
   const data = await load();
   const g = ensureGuild(data, guildId);
   let profile = g.profiles[userId];
@@ -331,47 +255,20 @@ export async function recordInfraction(
     profile = newProfile(userId, now);
     g.profiles[userId] = profile;
   }
-  const entry: InfractionEntry = {
-    id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-    type,
-    at: now,
-    byUserId,
-    reason,
-  };
+  const entry: InfractionEntry = { id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`, type, at: now, byUserId, reason };
   if (type === "strike") entry.expiresAt = now + 14 * 24 * 60 * 60 * 1000;
   profile.infractions.push(entry);
+  if (type === "termination") {
+    profile.terminated = true;
+    profile.terminatedAt = now;
+    profile.currentRoleId = null;
+    delete g.profiles[userId];
+  }
   await queueWrite(data);
   return entry;
 }
 
-/**
- * Returns active (non-expired) infractions of a given type. Strikes drop off
- * after 14 days; warnings/demotions/terminations never expire by default.
- */
-export function getActiveInfractions(
-  profile: StaffProfile,
-  type?: InfractionType,
-  now: number = Date.now(),
-): InfractionEntry[] {
-  return profile.infractions.filter((i) => {
-    if (type && i.type !== type) return false;
-    if (i.expiresAt && i.expiresAt < now) return false;
-    return true;
-  });
-}
-
-export async function listAllProfiles(
-  guildId: string,
-): Promise<StaffProfile[]> {
-  return listProfiles(guildId);
-}
-
-/** Remove a single infraction by id. Returns the removed entry or null. */
-export async function removeInfraction(
-  guildId: string,
-  userId: string,
-  infractionId: string,
-): Promise<InfractionEntry | null> {
+export async function removeInfraction(guildId: string, userId: string, infractionId: string): Promise<InfractionEntry | null> {
   const data = await load();
   const profile = data[guildId]?.profiles[userId];
   if (!profile) return null;
@@ -382,27 +279,60 @@ export async function removeInfraction(
   return removed;
 }
 
-/** Convenience: active strikes only (alias for getActiveInfractions(profile, "strike")). */
-export function activeStrikes(
-  infractions: InfractionEntry[],
-  now: number = Date.now(),
-): InfractionEntry[] {
-  return infractions.filter((i) => {
-    if (i.type !== "strike") return false;
+export async function removeInfractionsByType(
+  guildId: string,
+  userId: string,
+  type: InfractionType,
+): Promise<number> {
+  const data = await load();
+  const profile = data[guildId]?.profiles[userId];
+  if (!profile) return 0;
+  const before = profile.infractions.length;
+  profile.infractions = profile.infractions.filter((i) => i.type !== type);
+  const removed = before - profile.infractions.length;
+  if (removed > 0) {
+    await queueWrite(data);
+  }
+  return removed;
+}
+
+export function getActiveInfractions(profile: StaffProfile, type?: InfractionType, now: number = Date.now()): InfractionEntry[] {
+  return profile.infractions.filter((i) => {
+    if (type && i.type !== type) return false;
     if (i.expiresAt && i.expiresAt < now) return false;
     return true;
   });
 }
 
-/**
- * Force-expire every currently active strike on a profile (used after an
- * auto-demotion so the same strikes don't trigger another demotion). Returns
- * the number of strikes that were active and got expired.
- */
-export async function expireActiveStrikes(
-  guildId: string,
-  userId: string,
-): Promise<number> {
+export async function listAllProfiles(guildId: string): Promise<StaffProfile[]> {
+  return listProfiles(guildId);
+}
+
+export async function getAllGuildIds(): Promise<string[]> {
+  const data = await load();
+  return Object.keys(data);
+}
+
+export async function markInfractionExpiryDmSent(guildId: string, userId: string, infractionId: string): Promise<void> {
+  const data = await load();
+  const profile = data[guildId]?.profiles[userId];
+  if (!profile) return;
+  const inf = profile.infractions.find((i) => i.id === infractionId);
+  if (!inf) return;
+  inf.expiryDmSent = true;
+  await queueWrite(data);
+}
+
+export function activeStrikes(infractions: InfractionEntry[], now: number = Date.now(), expiryDays = 0): InfractionEntry[] {
+  return infractions.filter((i) => {
+    if (i.type !== "strike") return false;
+    if (i.expiresAt && i.expiresAt < now) return false;
+    if (expiryDays > 0 && i.at + expiryDays * 86_400_000 < now) return false;
+    return true;
+  });
+}
+
+export async function expireActiveStrikes(guildId: string, userId: string): Promise<number> {
   const data = await load();
   const profile = data[guildId]?.profiles[userId];
   if (!profile) return 0;
@@ -416,4 +346,15 @@ export async function expireActiveStrikes(
   }
   if (count > 0) await queueWrite(data);
   return count;
+}
+
+export async function incrementPartnershipScore(guildId: string, userId: string): Promise<StaffProfile | null> {
+  const data = await load();
+  const g = data[guildId];
+  if (!g) return null;
+  const profile = g.profiles[userId];
+  if (!profile) return null;
+  profile.partnershipScore += 1;
+  await queueWrite(data);
+  return profile;
 }

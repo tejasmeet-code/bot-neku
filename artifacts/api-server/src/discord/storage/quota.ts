@@ -1,5 +1,5 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { dataFile } from "../../lib/paths";
+import { loadPersistentJson, persistPersistentJson } from "./persistentJson";
 
 export type QuotaAction = "none" | "warning" | "strike" | "termination";
 
@@ -15,28 +15,21 @@ export interface UserQuota {
   weekly: WeekStat[];
 }
 
-const DATA_DIR = path.resolve(process.cwd(), ".data");
-const FILE_PATH = path.join(DATA_DIR, "quota.json");
+const FILE_PATH = dataFile("quota.json");
 
 let cache: Record<string, Record<string, UserQuota>> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 
 async function load(): Promise<Record<string, Record<string, UserQuota>>> {
   if (cache) return cache;
-  try {
-    const raw = await fs.readFile(FILE_PATH, "utf8");
-    cache = JSON.parse(raw) as Record<string, Record<string, UserQuota>>;
-  } catch {
-    cache = {};
-  }
+  cache = await loadPersistentJson("quota.json", FILE_PATH, {});
   return cache;
 }
 
 async function persist(
   data: Record<string, Record<string, UserQuota>>,
 ): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(FILE_PATH, JSON.stringify(data, null, 2), "utf8");
+  await persistPersistentJson("quota.json", FILE_PATH, data);
 }
 
 function queueWrite(
@@ -200,6 +193,34 @@ export interface QuotaStatus {
   metThisWeek: boolean;
   consecutiveMissed: number;
   nextAction: QuotaAction;
+}
+
+export interface EffectiveQuotaTargets {
+  messages: number;
+  modActions: number;
+  sourceRoleId: string | null;
+}
+
+export function resolveEffectiveQuotaTargets(
+  cfg: QuotaConfigLike & { roleQuotas?: Record<string, { messages: number; modActions: number }> },
+  heldRoleIds: Iterable<string>,
+): EffectiveQuotaTargets {
+  for (const roleId of heldRoleIds) {
+    const roleQuota = cfg.roleQuotas?.[roleId];
+    if (roleQuota) {
+      return {
+        messages: roleQuota.messages,
+        modActions: roleQuota.modActions,
+        sourceRoleId: roleId,
+      };
+    }
+  }
+
+  return {
+    messages: cfg.messages,
+    modActions: cfg.modActions,
+    sourceRoleId: null,
+  };
 }
 
 export async function resolveQuotaStatus(

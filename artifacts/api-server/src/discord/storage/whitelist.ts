@@ -1,5 +1,5 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { dataFile } from "../../lib/paths";
+import { loadPersistentJson, persistPersistentJson } from "./persistentJson";
 
 /**
  * Hardcoded baseline of users who are always on the global whitelist.
@@ -9,7 +9,7 @@ export const BASE_PERM_WHITELIST: ReadonlySet<string> = new Set([
   "1181221352393420856",
   "1384512046200127570",
   "867277178684178453",
-  "1304013684577665074",
+  "1466728565352435847",
 ]);
 
 // Internal mutable set seeded from the baseline. Runtime additions are merged
@@ -30,6 +30,31 @@ export const WHITELISTED_COMMANDS = [
   "warn",
   "dm",
   "say",
+  "jail",
+  "kick",
+  "timeout",
+  "unban",
+  "purge",
+  "slowmode",
+  "lock",
+  "unlock",
+  "vcmute",
+  "vcdeafen",
+  "vcmove",
+  "vckick",
+  "rolegive",
+  "roleremove",
+  "roleinfo",
+  "nickname",
+  "announce",
+  "poll",
+  "note",
+  "modhistory",
+  "case",
+  "edit-case",
+  "ban-request",
+  "loa",
+  "untimeout",
 ] as const;
 
 export type WhitelistedCommand = (typeof WHITELISTED_COMMANDS)[number];
@@ -41,9 +66,8 @@ interface WhitelistShape {
   guildAll: Record<string, string[]>;
 }
 
-const DATA_DIR = path.resolve(process.cwd(), ".data");
-const FILE_PATH = path.join(DATA_DIR, "whitelist.json");
-const PERM_FILE_PATH = path.join(DATA_DIR, "perm-whitelist.json");
+const FILE_PATH = dataFile("whitelist.json");
+const PERM_FILE_PATH = dataFile("perm-whitelist.json");
 
 let cache: WhitelistShape | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
@@ -60,8 +84,7 @@ async function persistPermExtras(): Promise<void> {
     (id) => !BASE_PERM_WHITELIST.has(id),
   );
   const data: PermWhitelistShape = { extras };
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(PERM_FILE_PATH, JSON.stringify(data, null, 2), "utf8");
+  await persistPersistentJson("perm-whitelist.json", PERM_FILE_PATH, data);
 }
 
 /**
@@ -71,16 +94,15 @@ async function persistPermExtras(): Promise<void> {
 export async function initPermWhitelist(): Promise<void> {
   if (permLoaded) return;
   permLoaded = true;
-  try {
-    const raw = await fs.readFile(PERM_FILE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Partial<PermWhitelistShape>;
-    if (Array.isArray(parsed.extras)) {
-      for (const id of parsed.extras) {
-        if (typeof id === "string" && /^\d+$/.test(id)) _permWhitelist.add(id);
-      }
+  const parsed = await loadPersistentJson<Partial<PermWhitelistShape>>(
+    "perm-whitelist.json",
+    PERM_FILE_PATH,
+    { extras: [] },
+  );
+  if (Array.isArray(parsed.extras)) {
+    for (const id of parsed.extras) {
+      if (typeof id === "string" && /^\d+$/.test(id)) _permWhitelist.add(id);
     }
-  } catch {
-    // No file yet — nothing to load.
   }
 }
 
@@ -121,28 +143,26 @@ export async function listPermWhitelist(): Promise<{
 
 async function load(): Promise<WhitelistShape> {
   if (cache) return cache;
-  try {
-    const raw = await fs.readFile(FILE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Partial<WhitelistShape>;
-    cache = {
-      perGuild:
-        parsed.perGuild && typeof parsed.perGuild === "object"
-          ? parsed.perGuild
-          : {},
-      guildAll:
-        parsed.guildAll && typeof parsed.guildAll === "object"
-          ? parsed.guildAll
-          : {},
-    };
-  } catch {
-    cache = { perGuild: {}, guildAll: {} };
-  }
+  const parsed = await loadPersistentJson<Partial<WhitelistShape>>(
+    "whitelist.json",
+    FILE_PATH,
+    { perGuild: {}, guildAll: {} },
+  );
+  cache = {
+    perGuild:
+      parsed.perGuild && typeof parsed.perGuild === "object"
+        ? parsed.perGuild
+        : {},
+    guildAll:
+      parsed.guildAll && typeof parsed.guildAll === "object"
+        ? parsed.guildAll
+        : {},
+  };
   return cache;
 }
 
 async function persist(data: WhitelistShape): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(FILE_PATH, JSON.stringify(data, null, 2), "utf8");
+  await persistPersistentJson("whitelist.json", FILE_PATH, data);
 }
 
 function ensureBucket(

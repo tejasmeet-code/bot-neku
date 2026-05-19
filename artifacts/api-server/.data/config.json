@@ -1,0 +1,54 @@
+{
+  "1305572982403498074": {
+    "managers": {
+      "roleIds": [
+        "1492764291940749353"
+      ],
+      "userIds": []
+    },
+    "modules": {
+      "staffMgmt": true,
+      "quota": true,
+      "auditLog": true
+    },
+    "channels": {
+      "promotions": "1493532796977807360",
+      "botNotifications": "1498990326726000681",
+      "demotions": "1493532796977807360",
+      "performance": "1494325774931722311"
+    },
+    "quotaConfig": {
+      "messages": 60,
+      "modActions": 3,
+      "weekStartDay": 5
+    }
+  },
+  "1490586810710102076": {
+    "managers": {
+      "roleIds": [],
+      "userIds": []
+    },
+    "modules": {
+      "staffMgmt": true,
+      "quota": true,
+      "auditLog": true
+    },
+    "channels": {
+      "botNotifications": "1498991543824941066"
+    }
+  },
+  "1466728565352435847": {
+    "managers": {
+      "roleIds": [],
+      "userIds": []
+    },
+    "modules": {
+      "staffMgmt": true,
+      "quota": true,
+      "auditLog": true
+    },
+    "channels": {
+      "botNotifications": "1498991506596298833"
+    }
+  }
+}

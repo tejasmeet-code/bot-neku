@@ -1,20 +1,23 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { dataFile } from "../../lib/paths";
+import { loadPersistentJson, persistPersistentJson } from "./persistentJson";
 
-export type ServerRole = "staff" | "main";
+export type ServerRole = "staff" | "main" | "appeals" | "secondary";
 
 export interface PendingConnection {
   id: string;
   fromGuildId: string;
   toGuildId: string;
-  declaredFromRole: ServerRole; // role of the requesting (from) guild
+  declaredFromRole: ServerRole;
   requestedBy: string;
   requestedAt: number;
 }
 
 export interface ActiveConnection {
-  staffGuildId: string;
-  mainGuildId: string;
+  id: string;
+  guildAId: string;
+  guildARole: ServerRole;
+  guildBId: string;
+  guildBRole: ServerRole;
   establishedAt: number;
   approvedBy: string;
 }
@@ -24,33 +27,62 @@ interface ConnectionsStore {
   active: ActiveConnection[];
 }
 
-const DATA_DIR = path.resolve(process.cwd(), ".data");
-const FILE_PATH = path.join(DATA_DIR, "connections.json");
+const FILE_PATH = dataFile("connections.json");
 
 let cache: ConnectionsStore | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 
+/** Migrate legacy { staffGuildId, mainGuildId } entries to the new model. */
+function migrate(raw: any): ConnectionsStore {
+  const pending: PendingConnection[] = Array.isArray(raw.pending) ? raw.pending : [];
+  const active: ActiveConnection[] = [];
+
+  for (const entry of (Array.isArray(raw.active) ? raw.active : [])) {
+    if (entry.id && entry.guildAId) {
+      // Already new format
+      active.push(entry as ActiveConnection);
+    } else if (entry.staffGuildId && entry.mainGuildId) {
+      // Legacy format — convert
+      active.push({
+        id: `legacy-${entry.staffGuildId}-${entry.mainGuildId}`,
+        guildAId: entry.staffGuildId,
+        guildARole: "staff",
+        guildBId: entry.mainGuildId,
+        guildBRole: "main",
+        establishedAt: entry.establishedAt ?? Date.now(),
+        approvedBy: entry.approvedBy ?? "unknown",
+      });
+    }
+  }
+
+  return { pending, active };
+}
+
 async function load(): Promise<ConnectionsStore> {
   if (cache) return cache;
-  try {
-    const raw = await fs.readFile(FILE_PATH, "utf8");
-    cache = JSON.parse(raw) as ConnectionsStore;
-    if (!Array.isArray(cache.pending)) cache.pending = [];
-    if (!Array.isArray(cache.active)) cache.active = [];
-  } catch {
-    cache = { pending: [], active: [] };
-  }
+  const raw = await loadPersistentJson<unknown>("connections.json", FILE_PATH, {
+    pending: [],
+    active: [],
+  });
+  cache = migrate(raw);
   return cache;
 }
 
 async function persist(data: ConnectionsStore): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(FILE_PATH, JSON.stringify(data, null, 2), "utf8");
+  await persistPersistentJson("connections.json", FILE_PATH, data);
 }
 
 function queueWrite(data: ConnectionsStore): Promise<void> {
   writeQueue = writeQueue.then(() => persist(data)).catch(() => {});
   return writeQueue;
+}
+
+/** Opposite role for a two-server pair. */
+function oppositeRole(role: ServerRole): ServerRole {
+  if (role === "staff") return "main";
+  if (role === "main") return "staff";
+  if (role === "secondary") return "secondary";
+  return "main"; // when an appeals server initiates, the other side is "main"
 }
 
 export async function listPending(): Promise<PendingConnection[]> {
@@ -113,21 +145,22 @@ export async function approvePending(
   const idx = d.pending.findIndex((p) => p.id === pendingId);
   if (idx === -1) return null;
   const p = d.pending.splice(idx, 1)[0]!;
-  // Remove any existing connections involving either guild first.
+
+  // Remove only existing connections between THIS specific pair of guilds.
   d.active = d.active.filter(
     (a) =>
-      a.staffGuildId !== p.fromGuildId &&
-      a.staffGuildId !== p.toGuildId &&
-      a.mainGuildId !== p.fromGuildId &&
-      a.mainGuildId !== p.toGuildId,
+      !(
+        (a.guildAId === p.fromGuildId && a.guildBId === p.toGuildId) ||
+        (a.guildAId === p.toGuildId && a.guildBId === p.fromGuildId)
+      ),
   );
-  const staffGuildId =
-    p.declaredFromRole === "staff" ? p.fromGuildId : p.toGuildId;
-  const mainGuildId =
-    p.declaredFromRole === "main" ? p.fromGuildId : p.toGuildId;
+
   const active: ActiveConnection = {
-    staffGuildId,
-    mainGuildId,
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    guildAId: p.fromGuildId,
+    guildARole: p.declaredFromRole,
+    guildBId: p.toGuildId,
+    guildBRole: oppositeRole(p.declaredFromRole),
     establishedAt: Date.now(),
     approvedBy: approvedByUserId,
   };
@@ -145,35 +178,57 @@ export async function rejectPending(pendingId: string): Promise<boolean> {
   return true;
 }
 
-export async function disconnectGuild(guildId: string): Promise<boolean> {
+/** Disconnect a specific pair of guilds. Returns false if no match found. */
+export async function disconnectGuild(
+  guildId: string,
+  otherGuildId: string,
+): Promise<boolean> {
   const d = await load();
   const before = d.active.length;
   d.active = d.active.filter(
-    (a) => a.staffGuildId !== guildId && a.mainGuildId !== guildId,
+    (a) =>
+      !(
+        (a.guildAId === guildId && a.guildBId === otherGuildId) ||
+        (a.guildAId === otherGuildId && a.guildBId === guildId)
+      ),
   );
   if (d.active.length === before) return false;
   await queueWrite(d);
   return true;
 }
 
+/** All active connections this guild is part of. */
+export async function getConnectionsByGuild(
+  guildId: string,
+): Promise<Array<{ conn: ActiveConnection; role: ServerRole; otherGuildId: string }>> {
+  const d = await load();
+  const results: Array<{ conn: ActiveConnection; role: ServerRole; otherGuildId: string }> = [];
+  for (const a of d.active) {
+    if (a.guildAId === guildId) {
+      results.push({ conn: a, role: a.guildARole, otherGuildId: a.guildBId });
+    } else if (a.guildBId === guildId) {
+      results.push({ conn: a, role: a.guildBRole, otherGuildId: a.guildAId });
+    }
+  }
+  return results;
+}
+
+/**
+ * Backward-compatible helper used by crossServer / staffActions.
+ * Returns the first staff↔main connection for this guild.
+ */
 export async function getConnectedGuildId(
   guildId: string,
 ): Promise<{ otherGuildId: string; role: ServerRole; mainGuildId: string } | null> {
-  const d = await load();
-  const a = d.active.find(
-    (x) => x.staffGuildId === guildId || x.mainGuildId === guildId,
-  );
-  if (!a) return null;
-  if (a.staffGuildId === guildId) {
-    return {
-      otherGuildId: a.mainGuildId,
-      role: "staff",
-      mainGuildId: a.mainGuildId,
-    };
-  }
+  const all = await getConnectionsByGuild(guildId);
+  // Prefer staff/main connections (not appeals)
+  const link = all.find((c) => c.role === "staff" || c.role === "main");
+  if (!link) return null;
+  const mainGuildId =
+    link.conn.guildARole === "main" ? link.conn.guildAId : link.conn.guildBId;
   return {
-    otherGuildId: a.staffGuildId,
-    role: "main",
-    mainGuildId: a.mainGuildId,
+    otherGuildId: link.otherGuildId,
+    role: link.role,
+    mainGuildId,
   };
 }
