@@ -64,9 +64,10 @@ const command: SlashCommand = {
         .addStringOption((o) =>
           o
             .setName("name")
-            .setDescription("Preset ID (e.g. standard, strict, moderation, minimal, partnership).")
+            .setDescription("Preset ID (e.g. neku, standard, strict, moderation, minimal, partnership).")
             .setRequired(true)
             .addChoices(
+              { name: "Neku Standard", value: "neku" },
               { name: "Standard", value: "standard" },
               { name: "Strict Staff", value: "strict" },
               { name: "Moderation Focus", value: "moderation" },
@@ -85,6 +86,7 @@ const command: SlashCommand = {
             .setDescription("Which preset to apply.")
             .setRequired(true)
             .addChoices(
+              { name: "Neku Standard", value: "neku" },
               { name: "Standard", value: "standard" },
               { name: "Strict Staff", value: "strict" },
               { name: "Moderation Focus", value: "moderation" },

@@ -16,6 +16,50 @@ export interface Preset {
 }
 
 export const PRESETS: Record<string, Preset> = {
+  neku: {
+    id: "neku",
+    name: "Neku Standard",
+    description: "Default settings used across Neku-managed servers. 60 messages or 3 mod actions per week, Friday week start.",
+    highlights: [
+      "staffMgmt, quota & auditLog enabled",
+      "Quota: 60 messages OR 3 mod actions/week",
+      "Week starts on Friday",
+      "Strikes expire after 30 days",
+      "Auto-demotion on 3+ active strikes",
+      "Quota failures: warning → strike → termination",
+    ],
+    config: {
+      modules: {
+        staffMgmt: true,
+        quota: true,
+        auditLog: true,
+        moderation: false,
+        infractions: true,
+        appeals: false,
+        loa: false,
+        partnership: false,
+        verify: false,
+        banRequest: false,
+        roleMemory: false,
+        antiNuke: false,
+      },
+      quotaConfig: { messages: 60, modActions: 3, weekStartDay: 5 },
+      infractionsConfig: {
+        strikeExpiryDays: 30,
+        dmOnInfraction: false,
+        autoDemotionEnabled: true,
+        strikeAction1: "warning",
+        strikeAction2: "strike",
+        strikeAction3plus: "termination",
+      },
+      quotaFailureConfig: {
+        failure1: "warning",
+        failure2: "strike",
+        failure3plus: "termination",
+      },
+    },
+  },
+
   standard: {
     id: "standard",
     name: "Standard",
