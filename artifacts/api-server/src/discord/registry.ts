@@ -82,6 +82,8 @@ import whitelist from "./commands/whitelist";
 import closeTicket from "./commands/close-ticket";
 import unclaim from "./commands/unclaim";
 import adduser from "./commands/adduser";
+import template from "./commands/template";
+import preset from "./commands/preset";
 import staffShopScore from "./commands/staff-shop-score";
 import customerPoints from "./commands/customer-points";
 import shopTopStaff from "./commands/shop-top-staff";
@@ -171,6 +173,8 @@ const commands: SlashCommand[] = [
   closeTicket,
   unclaim,
   adduser,
+  template,
+  preset,
   staffShopScore,
   customerPoints,
   shopTopStaff,
