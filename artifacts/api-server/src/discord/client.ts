@@ -202,6 +202,16 @@ export async function startDiscordBot(): Promise<void> {
             await interaction.reply({ content: "Something went wrong.", flags: 1 << 6 }).catch(() => {});
           }
         }
+      } else if (interaction.customId.startsWith("banreq:")) {
+        const { handleBanRequestButton } = await import("./commands/ban-request");
+        try {
+          await handleBanRequestButton(interaction as ButtonInteraction);
+        } catch (err) {
+          logger.error({ err }, "Error handling ban-request button");
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: "Something went wrong.", flags: 1 << 6 }).catch(() => {});
+          }
+        }
       }
       return;
     }
