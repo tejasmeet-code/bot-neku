@@ -189,16 +189,21 @@ async function finalizeClose(
     }
   }
 
-  // Record stats if successful
-  if (outcome === "success" && item && ticket.claimedBy) {
+  // Record stats and send feedback DM if successful
+  if (outcome === "success" && item) {
     const saleDate = Date.now();
-    await addSale(ticket.guildId, ticket.claimedBy, {
-      ticketId: ticket.ticketId,
-      item,
-      price: price ?? "N/A",
-      date: saleDate,
-      customerId: ticket.userId,
-    });
+
+    // Staff stats — only when ticket was claimed
+    if (ticket.claimedBy) {
+      await addSale(ticket.guildId, ticket.claimedBy, {
+        ticketId: ticket.ticketId,
+        item,
+        price: price ?? "N/A",
+        date: saleDate,
+        customerId: ticket.userId,
+      });
+    }
+
     const prevRecord = await getCustomerRecord(ticket.guildId, ticket.userId);
     const isFirstPurchase = prevRecord.purchases.length === 0;
     await addPurchase(ticket.guildId, ticket.userId, {
@@ -206,7 +211,7 @@ async function finalizeClose(
       item,
       price: price ?? "N/A",
       date: saleDate,
-      staffId: ticket.claimedBy,
+      staffId: ticket.claimedBy ?? "",
     });
 
     // Assign customer role on first purchase
@@ -221,7 +226,7 @@ async function finalizeClose(
       }
     }
 
-    // DM customer for rating
+    // DM customer for rating — always sent on successful close
     try {
       const customer = await client.users.fetch(ticket.userId).catch(() => null);
       if (customer) {
