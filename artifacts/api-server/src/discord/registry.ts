@@ -80,6 +80,8 @@ import whitelistGlobal from "./commands/whitelist-global";
 import whitelistAll from "./commands/whitelistAll";
 import whitelist from "./commands/whitelist";
 import closeTicket from "./commands/close-ticket";
+import unclaim from "./commands/unclaim";
+import adduser from "./commands/adduser";
 import staffShopScore from "./commands/staff-shop-score";
 import customerPoints from "./commands/customer-points";
 import shopTopStaff from "./commands/shop-top-staff";
@@ -167,6 +169,8 @@ const commands: SlashCommand[] = [
   whitelistAll,
   whitelist,
   closeTicket,
+  unclaim,
+  adduser,
   staffShopScore,
   customerPoints,
   shopTopStaff,
