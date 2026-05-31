@@ -82,23 +82,22 @@ const command: SlashCommand = {
       return;
     }
 
+    // Defer before async API calls to avoid the 3-second Discord timeout
+    await interaction.deferReply({ ephemeral: true });
+
     const member = await interaction.guild.members
       .fetch(target.id)
       .catch(() => null);
 
     if (!member) {
-      await interaction.reply({
-        content: "That user isn't in this server.",
-        ephemeral: true,
-      });
+      await interaction.editReply({ content: "That user isn't in this server." });
       return;
     }
 
     if (!member.moderatable) {
-      await interaction.reply({
+      await interaction.editReply({
         content:
           "I can't mute that user. They may have a higher role than me, or I lack the Moderate Members permission.",
-        ephemeral: true,
       });
       return;
     }
@@ -111,10 +110,9 @@ const command: SlashCommand = {
       invoker.roles.highest.position <= member.roles.highest.position &&
       interaction.guild.ownerId !== invoker.id
     ) {
-      await interaction.reply({
+      await interaction.editReply({
         content:
           "You can't mute a user with a role equal to or higher than your own.",
-        ephemeral: true,
       });
       return;
     }
@@ -122,15 +120,11 @@ const command: SlashCommand = {
     try {
       await member.timeout(ms, `${reason} — by ${interaction.user.tag}`);
       const until = Math.floor((Date.now() + ms) / 1000);
-      await interaction.reply({
+      await interaction.editReply({
         content: `🔇 **${target.tag}** has been muted until <t:${until}:R>. Reason: ${reason}`,
-        ephemeral: true,
       });
     } catch {
-      await interaction.reply({
-        content: "Failed to mute that user.",
-        ephemeral: true,
-      });
+      await interaction.editReply({ content: "Failed to mute that user." });
     }
   },
 };

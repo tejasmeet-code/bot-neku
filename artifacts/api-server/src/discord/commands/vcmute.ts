@@ -20,24 +20,27 @@ const command: SlashCommand = {
     const mute = interaction.options.getBoolean("mute", true);
     const reason = interaction.options.getString("reason") ?? `${mute ? "Muted" : "Unmuted"} by ${interaction.user.tag}`;
 
+    // Defer before async API calls to avoid the 3-second Discord timeout
+    await interaction.deferReply({ flags: 1 << 6 });
+
     const member = await interaction.guild.members.fetch(target.id).catch(() => null);
     if (!member) {
-      await interaction.reply({ embeds: [errorEmbed("Not in server", "That user is not in this server.")] , flags: 1 << 6 });
+      await interaction.editReply({ embeds: [errorEmbed("Not in server", "That user is not in this server.")] });
       return;
     }
     if (!member.voice.channel) {
-      await interaction.reply({ embeds: [errorEmbed("Not in voice", `**${target.tag}** is not in a voice channel.`)] , flags: 1 << 6 });
+      await interaction.editReply({ embeds: [errorEmbed("Not in voice", `**${target.tag}** is not in a voice channel.`)] });
       return;
     }
 
     try {
       await member.voice.setMute(mute, reason);
     } catch {
-      await interaction.reply({ embeds: [errorEmbed("Failed", "Could not mute/unmute that user — check my permissions.")] , flags: 1 << 6 });
+      await interaction.editReply({ embeds: [errorEmbed("Failed", "Could not mute/unmute that user — check my permissions.")] });
       return;
     }
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [prettyEmbed({
         title: mute ? "VC Muted" : "VC Unmuted",
         description: `${CE.success.str}\n\n${buildBullets([
@@ -48,7 +51,6 @@ const command: SlashCommand = {
         thumbnail: target.displayAvatarURL({ size: 256 }),
         color: mute ? COLORS.warning : COLORS.success,
       })],
-      flags: 1 << 6,
     });
   },
 };

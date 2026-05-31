@@ -55,16 +55,18 @@ const command: SlashCommand = {
       return;
     }
 
+    // Defer before async API calls to avoid the 3-second Discord timeout
+    await interaction.deferReply({ ephemeral: true });
+
     const member = await interaction.guild.members
       .fetch(target.id)
       .catch(() => null);
 
     if (member) {
       if (!member.bannable) {
-        await interaction.reply({
+        await interaction.editReply({
           content:
             "I can't ban that user. They may have a higher role than me, or I lack the Ban Members permission.",
-          ephemeral: true,
         });
         return;
       }
@@ -76,10 +78,9 @@ const command: SlashCommand = {
         invoker.roles.highest.position <= member.roles.highest.position &&
         interaction.guild.ownerId !== invoker.id
       ) {
-        await interaction.reply({
+        await interaction.editReply({
           content:
             "You can't ban a user with a role equal to or higher than your own.",
-          ephemeral: true,
         });
         return;
       }
@@ -90,14 +91,12 @@ const command: SlashCommand = {
         reason: `${reason} — by ${interaction.user.tag}`,
         deleteMessageSeconds: deleteDays * 86400,
       });
-      await interaction.reply({
+      await interaction.editReply({
         content: `🔨 **${target.tag}** has been banned. Reason: ${reason}`,
-        ephemeral: true,
       });
     } catch {
-      await interaction.reply({
+      await interaction.editReply({
         content: "Failed to ban that user.",
-        ephemeral: true,
       });
     }
   },

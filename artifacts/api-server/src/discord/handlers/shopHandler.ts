@@ -131,14 +131,14 @@ async function finalizeClose(
   item?: string,
   price?: string,
 ): Promise<void> {
+  // NOTE: Do NOT early-return when guild is unavailable — DM, stats, and ticket
+  // updates must always run regardless of guild reachability.
   const guild = client.guilds.cache.get(ticket.guildId) ?? await client.guilds.fetch(ticket.guildId).catch(() => null);
-  if (!guild) return;
+  const shopSettings = guild ? await getShopSettings(ticket.guildId) : null;
+  const channel = guild ? guild.channels.cache.get(ticket.channelId) as TextChannel | null : null;
 
-  const channel = guild.channels.cache.get(ticket.channelId) as TextChannel | null;
-  const shopSettings = await getShopSettings(ticket.guildId);
-
-  // Generate and send transcript
-  if (channel && shopSettings.transcriptChannelId) {
+  // Generate and send transcript (guild-dependent)
+  if (guild && shopSettings && channel && shopSettings.transcriptChannelId) {
     try {
       const transcriptCh = guild.channels.cache.get(shopSettings.transcriptChannelId) as TextChannel | null;
       if (transcriptCh) {
@@ -164,8 +164,8 @@ async function finalizeClose(
     }
   }
 
-  // Log
-  if (shopSettings.logChannelId) {
+  // Log (guild-dependent)
+  if (guild && shopSettings && shopSettings.logChannelId) {
     const logCh = guild.channels.cache.get(shopSettings.logChannelId) as TextChannel | null;
     if (logCh) {
       await logCh.send({
@@ -214,8 +214,8 @@ async function finalizeClose(
       staffId: ticket.claimedBy ?? "",
     });
 
-    // Assign customer role on first purchase
-    if (isFirstPurchase && shopSettings.customerRoleId && guild) {
+    // Assign customer role on first purchase (guild-dependent)
+    if (guild && shopSettings && isFirstPurchase && shopSettings.customerRoleId) {
       try {
         const member = await guild.members.fetch(ticket.userId).catch(() => null);
         if (member && !member.roles.cache.has(shopSettings.customerRoleId)) {
@@ -226,22 +226,33 @@ async function finalizeClose(
       }
     }
 
-    // DM customer for rating — always sent on successful close
+    // DM customer for rating — always attempted on successful close
     try {
       const customer = await client.users.fetch(ticket.userId).catch(() => null);
       if (customer) {
-        const embed = new EmbedBuilder()
+        const ratingEmbed = new EmbedBuilder()
           .setTitle("⭐ Rate Your Experience")
           .setDescription(`Thanks for purchasing from **${ticket.shopName}**!\nPlease rate the service you received out of 10.\n\n**What you got:** ${item} @ ${price}`)
           .setColor(COLORS.primary)
           .setTimestamp();
-        await customer.send({
-          embeds: [embed],
+        const dmSent = await customer.send({
+          embeds: [ratingEmbed],
           components: [ratingRow1(ticket.ticketId), ratingRow2(ticket.ticketId)],
-        }).catch(() => {});
+        }).catch((err) => {
+          logger.warn({ err, userId: ticket.userId }, "[Shop] Failed to DM customer for rating (DMs may be disabled)");
+          return null;
+        });
+        // Fallback: post rating prompt in the ticket channel before it's deleted
+        if (!dmSent && channel) {
+          await channel.send({
+            content: `<@${ticket.userId}> We couldn't DM you — please rate your experience here before this ticket closes:`,
+            embeds: [ratingEmbed],
+            components: [ratingRow1(ticket.ticketId), ratingRow2(ticket.ticketId)],
+          }).catch(() => {});
+        }
       }
     } catch (err) {
-      logger.warn({ err }, "[Shop] Failed to DM customer for rating");
+      logger.warn({ err }, "[Shop] Unexpected error sending rating DM");
     }
   }
 
