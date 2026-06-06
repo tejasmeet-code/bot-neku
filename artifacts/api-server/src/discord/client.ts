@@ -244,6 +244,22 @@ export async function startDiscordBot(): Promise<void> {
         }
         return;
       }
+
+      if (interaction.customId.startsWith("dm-message|")) {
+        const { handleDmModalSubmit } = await import("./commands/dm");
+        try {
+          await handleDmModalSubmit(interaction);
+        } catch (err) {
+          logger.error({ err }, "Error handling DM modal submit");
+          const reply = { content: "There was an error sending the DM.", flags: 1 << 6 };
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(reply).catch(() => {});
+          } else {
+            await interaction.reply(reply).catch(() => {});
+          }
+        }
+        return;
+      }
     }
 
     if (!interaction.isChatInputCommand()) return;
