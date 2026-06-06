@@ -37,7 +37,7 @@ async function callGemini(prompt: string): Promise<AdminPlan> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
 
-  const model = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
+  const model = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat-v3.1:free";
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -57,6 +57,9 @@ async function callGemini(prompt: string): Promise<AdminPlan> {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    if (res.status === 429) {
+      throw new Error("OpenRouter free model is rate-limited. Wait a minute or set OPENROUTER_MODEL to another free model (or add credits at openrouter.ai).");
+    }
     throw new Error(`OpenRouter API returned ${res.status}: ${body.slice(0, 200)}`);
   }
 
