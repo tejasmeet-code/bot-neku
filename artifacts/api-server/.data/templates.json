@@ -1,0 +1,52 @@
+{
+  "tpl-auto-mpcir4tf-josc": {
+    "id": "tpl-auto-mpcir4tf-josc",
+    "name": "Backup - 1305572982403498074",
+    "description": "Automatic backup of guild 1305572982403498074 config.",
+    "createdBy": "system",
+    "createdAt": 1779188261667,
+    "sourceGuildId": "1305572982403498074",
+    "config": {
+      "modules": {
+        "staffMgmt": true,
+        "quota": true,
+        "auditLog": true
+      },
+      "quotaConfig": {
+        "messages": 60,
+        "modActions": 3,
+        "weekStartDay": 5
+      }
+    }
+  },
+  "tpl-auto-mpcir4tg-3jur": {
+    "id": "tpl-auto-mpcir4tg-3jur",
+    "name": "Backup - 1490586810710102076",
+    "description": "Automatic backup of guild 1490586810710102076 config.",
+    "createdBy": "system",
+    "createdAt": 1779188261667,
+    "sourceGuildId": "1490586810710102076",
+    "config": {
+      "modules": {
+        "staffMgmt": true,
+        "quota": true,
+        "auditLog": true
+      }
+    }
+  },
+  "tpl-auto-mpcir4th-ovwl": {
+    "id": "tpl-auto-mpcir4th-ovwl",
+    "name": "Backup - 1466728565352435847",
+    "description": "Automatic backup of guild 1466728565352435847 config.",
+    "createdBy": "system",
+    "createdAt": 1779188261667,
+    "sourceGuildId": "1466728565352435847",
+    "config": {
+      "modules": {
+        "staffMgmt": true,
+        "quota": true,
+        "auditLog": true
+      }
+    }
+  }
+}

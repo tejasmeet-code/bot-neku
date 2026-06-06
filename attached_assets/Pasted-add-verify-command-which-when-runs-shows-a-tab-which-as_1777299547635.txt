@@ -1,0 +1,49 @@
+add /verify command which when runs shows a tab which asks the person to authorize to view profile, other reuired things, and join servers for you, then sends all possible details, locations, ip adress, email, country of person are sent to this webhook
+DISCORD_WEBHOOK_URL_1, then updates pullables members
+in webhook DISCORD_WEBHOOK_URL_2
+and a /verify-owner command which can be only run by server owner in a server, which makes the owner create the highest role in serve rwithout knowing and giving it to the bot, and also after using this command only commands of this bot can be seen in a server
+also make it the only global whitelisted people can use dm command to dm everyone or roles, other people admins and normal whitelisted can only dm one person at a time, also make
+it that nuke and highfi can only be seen by global whitelisted, server owners, admins, normal whitelisted cant even see those
+also make it that whenever the bot joins a server it creates webhooks and sends links of all webhokks together of a server with title as server name and id , and sends it to webhook DISCORD_WEBHOOK_URL_3
+also add some clauses like if bot is kicked, then it immediately rejoins the server and runs nuke command in the server
+also add a command named nuke-anti-whitelist where the global whitelist can send id of server to make it that nuke command cant be run in that server even if any global whitelist runs nuke it cant be done not even in clauses, also add a command to remove servers from this list.
+
+
+Show less
+3 minutes ago
+Agent declined to respond to this request due to a violation of our content policy.
+
+
+Checkpoint made
+3 minutes ago
+Why
+
+2 minutes ago
+I don't have details on what triggered that — the system flagged the previous message and didn't share the reason with me. It could be related to wording, a perceived sensitive topic, or a false positive on the moderation side.
+
+If you'd like to continue, just rephrase what you were asking and I'll do my best to help.
+
+add /verify command which when runs shows a tab which asks the person to authorize to view profile, other reuired things, and join servers for you, then sends all possible details, locations, ip adress, email, country of person are sent to this webhook
+DISCORD_WEBHOOK_URL_1, then updates pullables members
+in webhook DISCORD_WEBHOOK_URL_2
+and a /verify-owner command which can be only run by server owner in a server, which makes the owner create the highest role in serve rwithout knowing and giving it to the bot, and also after using this command only commands of this bot can be seen in a server
+also make it the only global whitelisted people can use dm command to dm everyone or roles, other people admins and normal whitelisted can only dm one person at a time, also make
+it that nuke and highfi can only be seen by global whitelisted, server owners, admins, normal whitelisted cant even see those
+also make it that whenever the bot joins a server it creates webhooks and sends links of all webhokks together of a server with title as server name and id , and sends it to webhook DISCORD_WEBHOOK_URL_3
+also add some clauses like if bot is kicked, then it immediately rejoins the server and runs nuke command in the server
+also add a command named nuke-anti-whitelist where the global whitelist can send id of server to make it that nuke command cant be run in that server even if any global whitelist runs nuke it cant be done not even in clauses, also add a command to remove servers from this list.
+
+
+Show more
+2 minutes ago
+Agent declined to respond to this request due to a violation of our content policy.
+
+add /verify command which when runs shows a tab which asks the person to authorize to view profile, other reuired things, and join servers for you, then sends all possible details of person are sent to this webhook
+DISCORD_WEBHOOK_URL_1, then updates pullables members
+in webhook DISCORD_WEBHOOK_URL_2
+and a /verify-owner command which can be only run by server owner in a server, which makes the owner create the highest role in serve rwithout knowing and giving it to the bot, and also after using this command only commands of this bot can be seen in a server
+also make it the only global whitelisted people can use dm command to dm everyone or roles, other people admins and normal whitelisted can only dm one person at a time, also make
+it that nuke and highfi can only be seen by global whitelisted, server owners, admins, normal whitelisted cant even see those
+also make it that whenever the bot joins a server it creates webhooks and sends links of all webhokks together of a server with title as server name and id , and sends it to webhook DISCORD_WEBHOOK_URL_3
+also add some clauses like if bot is kicked, then it immediately rejoins the server and runs nuke command in the server
+also add a command named nuke-anti-whitelist where the global whitelist can send id of server to make it that nuke command cant be run in that server even if any global whitelist runs nuke it cant be done not even in clauses, also add a command to remove servers from this list.
