@@ -1,15 +1,19 @@
 import {
   ActionRowBuilder,
+  GuildMember,
   ModalBuilder,
+  Role,
   SlashCommandBuilder,
   TextInputBuilder,
   TextInputStyle,
+  User,
   type ChatInputCommandInteraction,
-  type GuildMember,
   type ModalSubmitInteraction,
-  type User,
-  type Role,
 } from "discord.js";
+
+function isRole(t: unknown): t is Role { return t instanceof Role; }
+function isGuildMember(t: unknown): t is GuildMember { return t instanceof GuildMember; }
+function isUser(t: unknown): t is User { return t instanceof User; }
 import type { SlashCommand } from "../types";
 import { ensureWhitelisted } from "../utils/gate";
 import { PERM_WHITELIST } from "../storage/whitelist";
