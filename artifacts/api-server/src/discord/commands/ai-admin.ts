@@ -30,45 +30,49 @@ interface AdminPlan {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Gemini API call (direct REST, no SDK)
+// OpenRouter API call (OpenAI-compatible REST)
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function callGemini(prompt: string): Promise<AdminPlan> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
 
-  const res = await fetch(
-    "https://ai.gateway.lovable.dev/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.1,
-      }),
+  const model = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://github.com/tejasmeet-code/bot-neku",
+      "X-Title": "bot-neku ai-admin",
     },
-  );
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+    }),
+  });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Lovable AI returned ${res.status}: ${body.slice(0, 200)}`);
+    throw new Error(`OpenRouter API returned ${res.status}: ${body.slice(0, 200)}`);
   }
 
   const data = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
   };
-  const text = data.choices?.[0]?.message?.content;
-  if (!text) throw new Error("Empty response from Lovable AI");
+  let text = data.choices?.[0]?.message?.content;
+  if (!text) throw new Error("Empty response from OpenRouter");
+
+  // Some free models wrap JSON in ```json ... ``` fences; strip them.
+  text = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/, "").trim();
 
   try {
     return JSON.parse(text) as AdminPlan;
   } catch {
-    throw new Error(`Lovable AI returned invalid JSON: ${text.slice(0, 200)}`);
+    throw new Error(`OpenRouter returned invalid JSON: ${text.slice(0, 200)}`);
   }
 }
 
@@ -331,9 +335,9 @@ USER INSTRUCTION: "${instruction}"`;
     try {
       plan = await callGemini(systemPrompt);
     } catch (err) {
-      console.error("[ai-admin] Gemini call failed:", err);
+      console.error("[ai-admin] OpenRouter call failed:", err);
       await interaction.editReply({
-        content: `${CE.error.str} **AI request failed.** Make sure \`LOVABLE_API_KEY\` is set.\n\`${err instanceof Error ? err.message : String(err)}\``,
+        content: `${CE.error.str} **AI request failed.** Make sure \`GOOGLE_API_KEY\` is set.\n\`${err instanceof Error ? err.message : String(err)}\``,
       });
       return;
     }
